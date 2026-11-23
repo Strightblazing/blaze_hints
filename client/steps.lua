@@ -114,6 +114,64 @@ function Steps.OnDialogClosed(huntId)
 end
 
 ---------------------------------------------------------------------------
+-- Where-to-look markers (Config.Markers): a floating icon over the spot, a thin ring on the ground.
+-- Hidden while a close-up camera or a hunt screen is up.
+---------------------------------------------------------------------------
+local Markers, markerLoop = {}, false
+
+local function accentColor()
+    local c = Config.Markers.color
+    if type(c) == 'table' then return c[1] or 242, c[2] or 106, c[3] or 33, c[4] or 210 end
+    local hex = tostring(Config.Accent or '#f26a21'):gsub('#', '')
+    return tonumber(hex:sub(1, 2), 16) or 242, tonumber(hex:sub(3, 4), 16) or 106, tonumber(hex:sub(5, 6), 16) or 33, 210
+end
+
+local function drawMarkers()
+    if markerLoop then return end
+    markerLoop = true
+    CreateThread(function()
+        local M = Config.Markers
+        local r, g, b, a = accentColor()
+        local icon = M.icon or 32
+        local flip = icon == 2 or icon == 3 or (icon >= 20 and icon <= 22) -- chevrons point down at the spot
+        local s, rs = M.iconScale or 0.35, M.ringScale or 0.9
+        while next(Markers) do
+            local sleep = 500
+            if not Camera.Active() and not Hints.nuiOpen then
+                local me = GetEntityCoords(PlayerPedId())
+                for _, m in pairs(Markers) do
+                    if #(me - m.coords) < (M.distance or 25.0) then
+                        sleep = 0
+                        local c = m.coords
+                        DrawMarker(icon, c.x, c.y, c.z + (m.height or M.height or 0.75), 0.0, 0.0, 0.0,
+                            flip and 180.0 or 0.0, 0.0, 0.0, s, s, s, r, g, b, a, M.bob ~= false, true, 2, false, nil, nil, false)
+                        if M.ring ~= false and not m.noRing then
+                            DrawMarker(25, c.x, c.y, c.z - 0.97, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, rs, rs, rs, r, g, b, 120,
+                                false, false, 2, false, nil, nil, false)
+                        end
+                    end
+                end
+            end
+            Wait(sleep)
+        end
+        markerLoop = false
+    end)
+end
+
+local markerSeq = 0
+local function addMarker(coords, height, noRing)
+    if not coords or not Config.Markers or Config.Markers.enabled == false then return end
+    markerSeq = markerSeq + 1
+    Markers[markerSeq] = { coords = coords, height = height, noRing = noRing }
+    drawMarkers()
+    return markerSeq
+end
+
+local function removeMarker(id)
+    if id then Markers[id] = nil end
+end
+
+---------------------------------------------------------------------------
 -- Helpers
 ---------------------------------------------------------------------------
 
@@ -151,6 +209,7 @@ local function clear(a, force)
     if a.npcKey then releaseNpc(a.npcKey, force) end
     if a.sceneKey then Scenes.Release(a.sceneKey) end
     if a.prop and DoesEntityExist(a.prop) then DeleteEntity(a.prop) end
+    removeMarker(a.marker)
     a.cleared = true
 end
 
@@ -195,6 +254,13 @@ end
 function setup.password(huntId, info, a)
     if info.npc then a.npcKey = useNpc(huntId, info.npc) end
     local coords = Hints.Vec(info.coords)
+    if info.marker then
+        if coords then
+            a.marker = addMarker(coords)
+        elseif info.npc then
+            a.marker = addMarker(Hints.Vec(info.npc.coords), 1.25, true) -- over the NPC's head
+        end
+    end
     if not coords then return end
     local label = info.label or Config.Text.enterCode
     a.target = addTarget(coords, ('blaze_hints_password_%d'):format(huntId), 'fa-solid fa-keyboard', label, function()
@@ -205,13 +271,16 @@ end
 
 -- npc: a ped with "Talk"
 function setup.npc(huntId, info, a)
-    if info.npc then a.npcKey = useNpc(huntId, info.npc) end
+    if not info.npc then return end
+    a.npcKey = useNpc(huntId, info.npc)
+    if info.marker then a.marker = addMarker(Hints.Vec(info.npc.coords), 1.25, true) end -- over the NPC's head
 end
 
 -- inspect: a spot (optionally a prop) with "Inspect"
 function setup.inspect(huntId, info, a)
     local coords = Hints.Vec(info.coords)
     if not coords then return end
+    if info.marker then a.marker = addMarker(coords) end
     if info.prop then
         CreateThread(function()
             local obj = spawnProp(info.prop, coords)
@@ -256,6 +325,7 @@ local function clearStash(s)
     if not s then return end
     if s.target then exports.ox_target:removeZone(s.target) end
     if s.sceneKey then Scenes.Release(s.sceneKey) end
+    removeMarker(s.marker)
 end
 
 RegisterNetEvent('blaze_hints:client:stash', function(huntId, info)
@@ -266,6 +336,7 @@ RegisterNetEvent('blaze_hints:client:stash', function(huntId, info)
         Steps.stash[huntId] = s
         if info.scene then s.sceneKey = Scenes.Use(info.scene) end
         local coords = Hints.Vec(info.coords)
+        if coords and info.marker then s.marker = addMarker(coords) end
         if coords then
             s.target = addTarget(coords, ('blaze_hints_stash_%d'):format(huntId),
                 info.unlocked and 'fa-solid fa-box-open' or 'fa-solid fa-lock',
@@ -286,4 +357,5 @@ function Steps.ClearAll()
         Steps.stash[huntId] = nil
     end
     for _, n in pairs(Npcs) do removeNpc(n) end
+    for id in pairs(Markers) do Markers[id] = nil end
 end

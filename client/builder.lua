@@ -276,6 +276,12 @@ local function daysParse(v)
     return out
 end
 
+local MARKER = { key = 'marker', type = 'select', label = 'Where-to-look marker',
+    description = 'A floating ? over the spot, only for the hunter on this step',
+    show = function(v) return v == true and 'on' or (v == false and 'off' or 'default') end,
+    parse = function(v) if v == 'on' then return true elseif v == 'off' then return false end end,
+    options = opt({ { 'default', 'Config default' }, { 'on', 'Show a marker' }, { 'off', 'No marker' } }) }
+
 local FIELDS = {
     hint = {
         { key = 'title', type = 'input', label = 'Title', description = 'Empty = "New hint"' },
@@ -297,6 +303,7 @@ local FIELDS = {
           options = opt({ { 'overlay', 'Inspect overlay' }, { 'note', 'Note item (blaze_note)' } }) },
         { key = 'camera', type = 'checkbox', label = 'Cinematic close-up camera', default = true },
         { key = 'prop', type = 'input', label = 'Prop model (optional)', description = 'e.g. prop_cs_envelope_01' },
+        MARKER,
     },
     npc = {
         { key = 'name', type = 'input', label = 'Name' },
@@ -306,11 +313,13 @@ local FIELDS = {
         { key = 'cinematic', type = 'select', label = 'Dialog style', show = cinematicShow, parse = cinematicParse,
           options = opt({ { 'default', 'Config default' }, { 'cinematic', 'Cinematic' }, { 'classic', 'Classic panel' } }) },
         { key = 'shop', type = 'input', label = 'Shop id (open_shop replies)' },
+        MARKER,
     },
     password = {
         { key = 'label', type = 'input', label = 'Target / screen title', description = 'Empty = "Enter code"' },
         { key = 'inputType', type = 'select', label = 'Input', default = 'keypad',
           options = opt({ { 'keypad', 'Keypad (digits)' }, { 'word', 'Word (letter tiles)' } }) },
+        MARKER,
     },
     scene = {
         { key = 'title', type = 'input', label = 'Arrival title' },
@@ -325,6 +334,7 @@ local FIELDS = {
           options = opt({ { 'permanent', 'Permanent personal storage' }, { 'reward', 'One-time reward box' } }) },
         { key = 'showWhileLocked', type = 'checkbox', label = 'Show it (locked) during the hunt', default = true },
         { key = 'unlockText', type = 'input', label = 'Unlock message (optional)' },
+        MARKER,
     },
     code = {
         { key = 'codeMode', type = 'select', label = 'Code', default = 'random',

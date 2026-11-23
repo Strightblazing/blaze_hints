@@ -179,6 +179,14 @@ local function npcInfo(huntId, step, locked)
     }
 end
 
+--- Does this step show a where-to-look marker? (step.marker = true / false, nil = Config.Markers.steps[kind])
+function Progress.MarkerOn(step, kind)
+    local m = Config.Markers or {}
+    if m.enabled == false then return false end
+    if step.marker ~= nil then return step.marker == true end
+    return (m.steps or {})[kind or step.type] == true
+end
+
 local function spotTable(v)
     return v and { x = v.x, y = v.y, z = v.z } or nil
 end
@@ -217,6 +225,12 @@ local function clientInfo(src, hunt, index, step, locked)
     elseif step.type == 'scene' then
         info.coords = spotTable(Progress.SpotFor(hunt.steps, index))
         info.radius = tonumber(step.radius) or 15.0
+    end
+
+    -- where-to-look marker: the step's own choice, else the config default for its type (never while locked)
+    if not locked then
+        local markerType = (step.type == 'password' and hostNpc(hunt.steps, index)) and 'npc' or step.type
+        info.marker = Progress.MarkerOn(step, markerType)
     end
 
     -- world scene (not while locked)

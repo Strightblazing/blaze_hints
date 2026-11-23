@@ -497,6 +497,16 @@
     const opt = (pairs) => pairs;
     const SOURCES = [['hint', 'Hint pieces'], ['note', 'Note item'], ['inspect', 'Inspect spot'], ['npc', 'NPC riddle'], ['receipt', 'Shop receipt'], ['scramble', 'Scramble']];
 
+    // "Show a marker": default (config) / on / off
+    function markerField(s) {
+        return fld('Where-to-look marker', input(s, 'marker', 'select', {
+            rerender: false,
+            options: opt([['default', 'Config default'], ['on', 'Show a marker'], ['off', 'No marker']]),
+            show: (v) => (v === true ? 'on' : v === false ? 'off' : 'default'),
+            parse: (v) => (v === 'on' ? true : v === 'off' ? false : undefined),
+        }), 'A floating ? over the spot, only for the hunter on this step');
+    }
+
     // ---- cards ----
     function generalCard(s) {
         const c = card(TYPE_LABEL[s.type] || 'Step', false);
@@ -525,6 +535,7 @@
                 ));
                 c.appendChild(input(s, 'piece', 'check', { label: 'Carries a code piece' }));
                 c.appendChild(input(s, 'camera', 'check', { label: 'Cinematic close-up camera', def: true }));
+                c.appendChild(markerField(s));
                 c.appendChild(coordsLine(s, 'coords', placeLabel));
                 if (!s.coords) c.appendChild(el('div', 'bd-empty', 'Not placed: uses its world scene, or the scene step right before it.'));
                 break;
@@ -540,11 +551,13 @@
                     })),
                     fld('Shop id (open_shop)', input(s, 'shop', 'text')),
                 ));
+                c.appendChild(markerField(s));
                 c.appendChild(coordsLine(s, 'coords', placeLabel));
                 break;
             case 'password':
                 c.appendChild(fld('Title', input(s, 'label', 'text', { placeholder: 'Enter code' })));
                 c.appendChild(fld('Input', input(s, 'inputType', 'select', { def: 'keypad', options: opt([['keypad', 'Keypad (digits)'], ['word', 'Word (letter tiles)']]) })));
+                c.appendChild(markerField(s));
                 c.appendChild(coordsLine(s, 'coords', 'Keypad spot'));
                 if (!s.coords) c.appendChild(el('div', 'bd-empty', 'Not placed: entered at the NPC right before it ("open password" reply) or on its scene.'));
                 break;
@@ -560,6 +573,7 @@
                 c.appendChild(row(fld('Slots', input(s, 'slots', 'number', { min: 1, def: B.defaults.slots })), fld('Max weight (g)', input(s, 'maxWeight', 'number', { min: 1000, def: B.defaults.maxWeight }))));
                 c.appendChild(fld('Unlock message (optional)', input(s, 'unlockText', 'text')));
                 c.appendChild(input(s, 'showWhileLocked', 'check', { label: 'Show it (locked) during the hunt', def: true }));
+                c.appendChild(markerField(s));
                 c.appendChild(coordsLine(s, 'coords', 'Stash'));
                 break;
         }

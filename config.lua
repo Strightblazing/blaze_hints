@@ -29,6 +29,21 @@ Config.HintGap = 1500              -- ms between back-to-back "after previous" h
 Config.NpcSpawnDistance = 80.0     -- hunt NPCs only exist on your screen inside this range
 Config.SceneSpawnDistance = 150.0  -- private world scenes only exist inside this range
 
+-- Where-to-look markers: a floating icon over the current inspect spot, keypad and (unlocked) stash.
+-- Only the hunter on that step sees it. Each step can turn it off in the builder ("Show a marker").
+Config.Markers = {
+    enabled = true,
+    distance = 25.0,               -- shown inside this range
+    icon = 32,                     -- GTA marker type: 32 = question mark, 2 = chevron, 29 = dollar sign, 20-22 = chevrons
+    iconScale = 0.35,
+    height = 0.75,                 -- metres above the spot
+    bob = true,                    -- bob up and down
+    ring = true,                   -- thin ring on the ground under it
+    ringScale = 0.9,
+    color = nil,                   -- { r, g, b, a }; nil = Config.Accent
+    steps = { inspect = true, password = true, stash = true, npc = false },
+}
+
 -- Your HUD: hidden while hunt screens are open. The GTA HUD and minimap always hide during the cinematic dialog / camera.
 -- It only shows again if it was on before, and only when nothing else here is still hiding it.
 Config.Hud = {

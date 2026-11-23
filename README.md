@@ -113,6 +113,9 @@ an optional temporary search-area blip.
 ## Config highlights
 
 - `Config.CinematicDialog`: letterbox + face camera + HUD hidden, or the small bottom-right panel (per NPC override).
+- `Config.Markers`: the where-to-look marker, a floating **?** (or any GTA marker type) over the current inspect spot,
+  keypad and unlocked stash, only for the hunter on that step and never while the step is time-locked. Each step can
+  force it on or off in the builder ("Where-to-look marker").
 - `Config.Hud`: which HUD export to hide (element_hud set up), and when.
 - `Config.Shop.system`: `auto` (Lation Shops, else ox_inventory), `lation` or `ox`.
 - `Config.MaxWrongTries`, `Config.DefaultCooldown`, `Config.ResetOnFail`: password defaults (per step in the builder).

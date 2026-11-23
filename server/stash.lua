@@ -76,6 +76,7 @@ function Stash.Info(hunt, row)
         coords = { x = spot.x, y = spot.y, z = spot.z },
         label = step.label or Config.Stash.label,
         unlocked = unlocked,
+        marker = unlocked and Progress.MarkerOn(step, 'stash') or nil, -- only once it opens for you
     }
     -- the scene it sits on stays while the stash is there. Private scenes only: a shared scene exists
     -- (server side) while someone is on its step. Same key as the step's scene, so it is never spawned twice.
