@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>blaze_hints</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Keypad -->
+    <div id="keypad" class="screen hidden">
+        <div class="kp-panel" id="kp-panel">
+            <div class="kp-title" id="kp-title">Enter code</div>
+            <div class="tiles small hidden" id="kp-tiles"></div>
+            <div class="kp-screen" id="kp-screen">
+                <div class="kp-dots" id="kp-dots"></div>
+                <div class="kp-open">OPEN</div>
+            </div>
+            <div class="kp-tries" id="kp-tries"></div>
+            <div class="kp-grid" id="kp-grid">
+                <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+                <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+                <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+                <button data-k="clr" class="kp-fn">CLR</button><button data-k="0">0</button><button data-k="ok" class="kp-ok">OK</button>
+            </div>
+            <div class="kp-foot">ESC to step away</div>
+        </div>
+    </div>
+
+    <!-- Word entry -->
+    <div id="word" class="screen hidden">
+        <div class="kp-panel wd-panel" id="wd-panel">
+            <div class="kp-title" id="wd-title">Enter the word</div>
+            <div class="tiles" id="wd-tiles"></div>
+            <div class="wd-field">
+                <input id="wd-input" type="text" autocomplete="off" spellcheck="false">
+                <div class="kp-open">OPEN</div>
+            </div>
+            <div class="kp-tries" id="wd-tries"></div>
+            <div class="wd-buttons">
+                <button id="wd-cancel" class="btn">Cancel</button>
+                <button id="wd-submit" class="btn primary">Submit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dialog: .cinematic = letterbox + centered line, .classic = panel bottom-right -->
+    <div id="dialog" class="screen dialog hidden">
+        <div class="bar bar-top"></div>
+        <div class="bar bar-bottom"></div>
+        <div class="dlg-box" id="dlg-box">
+            <div class="dlg-head">
+                <div class="dlg-avatar" id="dlg-avatar"></div>
+                <div class="dlg-name" id="dlg-name"></div>
+            </div>
+            <div class="dlg-text" id="dlg-text"></div>
+            <div class="dlg-replies" id="dlg-replies"></div>
+        </div>
+    </div>
+
+    <!-- Note reader -->
+    <div id="note" class="screen hidden">
+        <div class="note-card" id="note-card">
+            <div class="note-title" id="note-title"></div>
+            <div class="note-text" id="note-text"></div>
+            <button id="note-close" class="btn">Put away</button>
+        </div>
+    </div>
+
+    <!-- Inspect overlay -->
+    <div id="inspect" class="screen dialog cinematic hidden">
+        <div class="bar bar-top"></div>
+        <div class="bar bar-bottom"></div>
+        <div class="ins-circle hidden" id="ins-circle"></div>
+        <div class="ins-box">
+            <div class="ins-piece hidden" id="ins-piece"></div>
+            <div class="ins-caption" id="ins-caption"></div>
+            <div class="ins-stop" id="ins-stop">[E] Stop inspecting</div>
+        </div>
+    </div>
+
+    <!-- Builder -->
+    <div id="builder" class="screen hidden">
+        <div class="bd-window">
+            <aside class="bd-side">
+                <div class="bd-brand">Hunt builder</div>
+                <select id="bd-hunt" class="inp"></select>
+                <input id="bd-name" class="inp" placeholder="Hunt name">
+                <div class="bd-toggles">
+                    <label class="chk"><input type="checkbox" id="bd-enabled"><span>Enabled</span></label>
+                    <label class="chk"><input type="checkbox" id="bd-auto"><span>Starts for every character</span></label>
+                </div>
+                <div class="bd-steps" id="bd-steps"></div>
+                <div class="bd-add">
+                    <select id="bd-addtype" class="inp">
+                        <option value="hint">Hint</option>
+                        <option value="inspect">Inspect spot</option>
+                        <option value="npc">NPC</option>
+                        <option value="password">Password</option>
+                        <option value="scene">World scene</option>
+                        <option value="stash">Personal stash</option>
+                    </select>
+                    <button id="bd-addbtn" class="btn primary">Add step</button>
+                </div>
+                <div class="bd-side-foot">
+                    <button id="bd-reset" class="btn ghost">Reset my progress</button>
+                    <button id="bd-delete" class="btn ghost danger">Delete hunt</button>
+                </div>
+            </aside>
+            <main class="bd-main">
+                <header class="bd-head">
+                    <div>
+                        <div class="bd-kicker" id="bd-kicker"></div>
+                        <h1 id="bd-title">No step selected</h1>
+                    </div>
+                    <div class="bd-actions">
+                        <button id="bd-place" class="btn">Place here</button>
+                        <button id="bd-preview" class="btn">Preview</button>
+                        <button id="bd-save" class="btn primary">Save</button>
+                        <button id="bd-hide" class="btn icon" title="Hide (walk around, /huntbuilder brings it back)">&#8212;</button>
+                        <button id="bd-close" class="btn icon" title="Close">&#10005;</button>
+                    </div>
+                </header>
+                <div class="bd-cards" id="bd-cards"></div>
+            </main>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
