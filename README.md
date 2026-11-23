@@ -26,7 +26,6 @@ keypad or an NPC, and it ends at a personal ox_inventory stash.
 - `lation_ui`: Lation look for notifications and the menu builder
 - `lation_shops`: NPC shop replies open Lation Shops (otherwise an ox_inventory shop)
 - `Renewed-Weathersync` or `qb-weathersync`: in-game time for time locks (otherwise the real clock)
-- `element_hud` (or any HUD with a show / hide export): hidden while hint screens are open
 
 ## Install
 
@@ -154,7 +153,7 @@ an optional temporary search-area blip.
   force it on or off in the builder ("Where-to-look marker").
 - `Config.Camera`: hide your own character and players standing at the clue / NPC during hint cameras. Only on the
   screen of the player looking; everyone else still sees everyone.
-- `Config.Hud`: which HUD export to hide (element_hud set up), and when.
+- `Config.Hud`: hide your own HUD while hint screens are open: put its show / hide export here, or a toggle function.
 - `Config.Shop.system`: `auto` (Lation Shops, else ox_inventory), `lation` or `ox`.
 - `Config.MaxWrongTries`, `Config.DefaultCooldown`, `Config.ResetOnFail`: password defaults (per step in the builder).
 - `Config.Words`: random words for word codes.

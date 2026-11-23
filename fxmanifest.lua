@@ -46,7 +46,7 @@ files {
 }
 
 -- Required (see README > Requirements). Optional, used automatically when running:
--- lation_ui, lation_shops, Renewed-Weathersync or qb-weathersync, element_hud
+-- lation_ui, lation_shops, Renewed-Weathersync or qb-weathersync (your HUD is set in Config.Hud, not here)
 dependencies {
     'qbx_core',
     'ox_lib',
