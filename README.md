@@ -11,14 +11,31 @@ keypad or an NPC, and it ends at a personal ox_inventory stash.
   logout, death and step end.
 - All notifications use `lib.notify` (Lation UI restyles them). The only sound is a small click on keypad keys and letter tiles.
 
+## Requirements
+
+**Required** (the resource will not start without them):
+
+- Qbox ([qbx_core](https://github.com/Qbox-project/qbx_core))
+- [ox_lib](https://github.com/overextended/ox_lib)
+- [oxmysql](https://github.com/overextended/oxmysql)
+- [ox_target](https://github.com/overextended/ox_target): talk to NPCs, inspect spots, keypads, stashes
+- [ox_inventory](https://github.com/overextended/ox_inventory): note / receipt items, personal stashes, shops
+
+**Optional** (used automatically when running):
+
+- `lation_ui`: Lation look for notifications and the menu builder
+- `lation_shops`: NPC shop replies open Lation Shops (otherwise an ox_inventory shop)
+- `Renewed-Weathersync` or `qb-weathersync`: in-game time for time locks (otherwise the real clock)
+- `element_hud` (or any HUD with a show / hide export): hidden while hint screens are open
+
 ## Install
 
-1. Dependencies: `ox_lib`, `oxmysql`, `ox_target`, `ox_inventory`, `qbx_core`. Optional: `lation_ui` (menu builder look),
-   `lation_shops` (NPC shops), `Renewed-Weathersync` or `qb-weathersync` (in-game time locks), `element_hud` (HUD hiding).
-2. `ensure blaze_hints` after those.
+1. Put the folder in your resources (for example `resources/[standalone]/blaze_hints`) and keep the name
+   **blaze_hints**: the item exports use it.
+2. Add `ensure blaze_hints` to `server.cfg`, after everything under Requirements.
 3. The tables (`blaze_hints`, `blaze_hints_progress`) are created on start. `sql/blaze_hints.sql` has the same SQL if
    you want to run it yourself. Coming from 1.0.x: the old tables are renamed on start and everything is kept.
-4. Items (already added to this server's `ox_inventory/data/items.lua`; add them elsewhere like this):
+4. Add the two items to `ox_inventory/data/items.lua`:
 
 ```lua
 ['blaze_note'] = {
@@ -38,7 +55,7 @@ Using either one opens the note reader with that item's own text (each player's 
 5. Shop receipts:
    - **ox_inventory shops** work by themselves (a `buyItem` hook).
    - **Lation Shops**: add this to `OnItemPurchased` in `lation_shops/server/utils/hooks.lua`
-     (already done on this server):
+     (it does nothing while blaze_hints is stopped):
 
 ```lua
 if GetResourceState('blaze_hints') == 'started' then
