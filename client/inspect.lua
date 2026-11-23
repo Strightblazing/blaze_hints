@@ -13,7 +13,7 @@ function Inspect.Show(huntId, data, focus, opts)
     cur = { huntId = huntId, preview = opts.preview }
     if opts.camera ~= false then
         if type(focus) == 'number' and DoesEntityExist(focus) then
-            Camera.Focus(focus, { distance = 1.5, side = 0.0, height = 0.35, fov = 45.0 })
+            Camera.Focus(focus, { distance = 1.0, side = 0.35, height = 0.35, fov = 45.0, hidePlayer = true })
         elseif focus then
             Camera.FocusCoords(focus)
         end

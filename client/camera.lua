@@ -84,6 +84,16 @@ end
 ---------------------------------------------------------------------------
 Camera = { cam = nil }
 
+--- Hide your own ped on your screen while this camera is up (others still see you)
+local function hidePlayerWhile(cam)
+    CreateThread(function()
+        while Camera.cam == cam do
+            SetEntityLocallyInvisible(PlayerPedId())
+            Wait(0)
+        end
+    end)
+end
+
 --- Frame an entity: a ped's face (head bone) or an object's centre
 ---@param entity number
 ---@param opts? { distance?: number, fov?: number, side?: number, height?: number }
@@ -106,11 +116,13 @@ function Camera.Focus(entity, opts)
     SetCamActive(cam, true)
     RenderScriptCams(true, true, 700, true, true)
     Camera.cam = cam
+    if opts.hidePlayer then hidePlayerWhile(cam) end
     Hud.Radar('camera', true)
     Hud.Hold('camera', true)
 end
 
---- Frame a point in the world (an inspect spot without an entity), looking from the player's side
+--- Frame a point in the world (an inspect spot without an entity): close in, from your side at an angle,
+--- with your own ped hidden so it never blocks the clue
 function Camera.FocusCoords(target, opts)
     if not target then return end
     opts = opts or {}
@@ -119,12 +131,17 @@ function Camera.FocusCoords(target, opts)
     local dir = vector3(from.x - target.x, from.y - target.y, 0.0)
     local len = #dir
     dir = len > 0.01 and dir / len or vector3(0.0, -1.0, 0.0)
-    local pos = target + dir * (opts.distance or 1.1) + vector3(0.0, 0.0, opts.height or 0.45)
-    local cam = CreateCamWithParams('DEFAULT_SCRIPTED_CAMERA', pos.x, pos.y, pos.z, 0.0, 0.0, 0.0, opts.fov or 45.0, false, 0)
+    -- turn ~35 degrees off your line of sight so the shot is not straight over your shoulder
+    local a = math.rad(opts.angle or 35.0)
+    local ca, sa = math.cos(a), math.sin(a)
+    dir = vector3(dir.x * ca - dir.y * sa, dir.x * sa + dir.y * ca, 0.0)
+    local pos = target + dir * (opts.distance or 0.75) + vector3(0.0, 0.0, opts.height or 0.3)
+    local cam = CreateCamWithParams('DEFAULT_SCRIPTED_CAMERA', pos.x, pos.y, pos.z, 0.0, 0.0, 0.0, opts.fov or 50.0, false, 0)
     PointCamAtCoord(cam, target.x, target.y, target.z)
     SetCamActive(cam, true)
     RenderScriptCams(true, true, 700, true, true)
     Camera.cam = cam
+    if opts.hidePlayer ~= false then hidePlayerWhile(cam) end
     Hud.Radar('camera', true)
     Hud.Hold('camera', true)
 end
