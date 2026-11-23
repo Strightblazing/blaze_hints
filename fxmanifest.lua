@@ -45,10 +45,12 @@ files {
     'web/app.js',
 }
 
+-- Required (see README > Requirements). Optional, used automatically when running:
+-- lation_ui, lation_shops, Renewed-Weathersync or qb-weathersync, element_hud
 dependencies {
+    'qbx_core',
     'ox_lib',
     'oxmysql',
-    'ox_target',
-    'ox_inventory',
-    'qbx_core',
+    'ox_target',    -- NPCs, inspect spots, keypads, stashes
+    'ox_inventory', -- note / receipt items, personal stashes, shops
 }
