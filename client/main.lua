@@ -22,7 +22,7 @@ function Hints.OpenNui(action, data)
     Hints.nuiOpen = action
     local hold = HUD_HOLD[action]
     if hold and Config.Hud[hold] then Hud.Hold(action, true) end
-    SetNuiFocus(true, not data.noCursor) -- inspect: keyboard only
+    if not data.noFocus then SetNuiFocus(true, not data.noCursor) end -- inspect: no focus, the game keeps mouse + keys
     SendNUIMessage(data)
 end
 

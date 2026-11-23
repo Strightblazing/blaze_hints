@@ -10,23 +10,45 @@ function Inspect.IsOpen() return cur ~= nil end
 function Inspect.Show(huntId, data, focus, opts)
     if cur or Hints.nuiOpen then return end
     opts = opts or {}
-    cur = { huntId = huntId, preview = opts.preview }
-    if opts.camera ~= false then
+    local c = { huntId = huntId, preview = opts.preview }
+    cur = c
+    local camOn = opts.camera ~= false and focus ~= nil
+    if camOn then
+        -- orbit: mouse looks around the clue, the shot drifts by itself, your controls are locked
         if type(focus) == 'number' and DoesEntityExist(focus) then
-            Camera.Focus(focus, { distance = 1.0, side = 0.35, height = 0.35, fov = 45.0, hidePlayer = true })
-        elseif focus then
-            Camera.FocusCoords(focus)
+            Camera.Focus(focus, { distance = 1.0, side = 0.35, height = 0.35, fov = 45.0, hidePlayer = true, orbit = true })
+        else
+            Camera.FocusCoords(focus, { orbit = true })
         end
     end
+
+    -- The overlay takes no NUI focus, so the game keeps the mouse for the camera. E / ESC / Backspace stop.
+    CreateThread(function()
+        local readyAt = GetGameTimer() + 350 -- ignore the key press that opened it
+        while cur == c do
+            DisableControlAction(0, 200, true) -- ESC: no pause menu
+            DisableControlAction(0, 322, true)
+            DisableControlAction(0, 177, true) -- Backspace
+            if GetGameTimer() > readyAt then
+                for _, key in ipairs({ 38, 200, 322, 177 }) do -- E, ESC, ESC, Backspace
+                    if IsControlJustPressed(0, key) or IsDisabledControlJustPressed(0, key) then
+                        Hints.CloseNui()
+                        break
+                    end
+                end
+            end
+            Wait(0)
+        end
+    end)
     if Config.Hud.hideInReader then Hud.Hold('reader', true) end
     Hints.OpenNui('inspect', {
         caption = data.caption or '',
         pieceN = data.pieceN,
         pieceTotal = data.pieceTotal,
         pieceText = data.pieceN and Config.Text.pieceOverlay:format(data.pieceN, data.pieceTotal) or nil,
-        circle = opts.camera ~= false and focus ~= nil,
-        stopText = Config.Text.stopInspect,
-        noCursor = true,
+        circle = camOn,
+        stopText = camOn and Config.Text.stopInspectLook or Config.Text.stopInspect,
+        noFocus = true,
     })
 end
 

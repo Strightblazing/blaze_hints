@@ -84,11 +84,41 @@ end
 ---------------------------------------------------------------------------
 Camera = { cam = nil }
 
---- Hide your own ped on your screen while this camera is up (others still see you)
-local function hidePlayerWhile(cam)
+--- Every frame while this camera is up:
+---   hidePlayer: hide your own ped on your screen (others still see you)
+---   orbit:      your controls are locked; the mouse turns the camera around the target (limited range)
+---               and the shot slowly pushes in and sways by itself
+local function runCam(cam, target, pos, opts)
+    if not opts.hidePlayer and not opts.orbit then return end
+    local rel = pos - target
+    local baseYaw = math.atan(rel.y, rel.x)
+    local baseDist = math.max(0.3, #vector3(rel.x, rel.y, 0.0))
+    local baseHeight = rel.z
+    local maxYaw, maxUp, maxDown = math.rad(opts.maxYaw or 45.0), opts.maxUp or 0.45, opts.maxDown or 0.25
+    local yaw, lift = 0.0, 0.0
+    local started = GetGameTimer()
+
     CreateThread(function()
         while Camera.cam == cam do
-            SetEntityLocallyInvisible(PlayerPedId())
+            if opts.hidePlayer then SetEntityLocallyInvisible(PlayerPedId()) end
+            if opts.orbit then
+                DisableAllControlActions(0)
+                EnableControlAction(0, 249, true) -- push to talk
+                -- mouse / right stick look
+                local mx = GetDisabledControlNormal(0, 1)
+                local my = GetDisabledControlNormal(0, 2)
+                yaw = math.max(-maxYaw, math.min(maxYaw, yaw - mx * math.rad(opts.sensitivity or 10.0)))
+                lift = math.max(-maxDown, math.min(maxUp, lift + my * 0.12))
+                -- drift: slow push-in over ~10 s, then a gentle sway
+                local t = (GetGameTimer() - started) / 1000.0
+                local push = math.min(t / 10.0, 1.0)
+                push = push * push * (3 - 2 * push)
+                local dist = baseDist * (1.0 - 0.18 * push)
+                local a = baseYaw + yaw + math.sin(t * 0.45) * math.rad(2.5)
+                local z = baseHeight + lift + math.sin(t * 0.7) * 0.015
+                SetCamCoord(cam, target.x + math.cos(a) * dist, target.y + math.sin(a) * dist, target.z + z)
+                PointCamAtCoord(cam, target.x, target.y, target.z)
+            end
             Wait(0)
         end
     end)
@@ -116,7 +146,7 @@ function Camera.Focus(entity, opts)
     SetCamActive(cam, true)
     RenderScriptCams(true, true, 700, true, true)
     Camera.cam = cam
-    if opts.hidePlayer then hidePlayerWhile(cam) end
+    runCam(cam, target, pos, opts)
     Hud.Radar('camera', true)
     Hud.Hold('camera', true)
 end
@@ -141,7 +171,8 @@ function Camera.FocusCoords(target, opts)
     SetCamActive(cam, true)
     RenderScriptCams(true, true, 700, true, true)
     Camera.cam = cam
-    if opts.hidePlayer ~= false then hidePlayerWhile(cam) end
+    if opts.hidePlayer == nil then opts.hidePlayer = true end
+    runCam(cam, target, pos, opts)
     Hud.Radar('camera', true)
     Hud.Hold('camera', true)
 end

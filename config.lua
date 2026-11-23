@@ -149,4 +149,5 @@ Config.Text = {
     tooLate       = 'Too late',
     tooLateMsg    = 'You took too long. The trail went cold: start over with a new code.',
     stopInspect   = '[E] Stop inspecting',
+    stopInspectLook = '[E] Stop inspecting  ·  Mouse to look around',
 }
