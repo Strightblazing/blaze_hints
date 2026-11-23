@@ -1,4 +1,4 @@
--- Camera + HUD: cinematic close-ups and hiding the HUD while hunt screens are open.
+-- Camera + HUD: cinematic close-ups and hiding the HUD while hint screens are open.
 -- Everything here is restored on close, death, logout, step end and resource stop.
 
 ---------------------------------------------------------------------------

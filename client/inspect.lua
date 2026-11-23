@@ -2,15 +2,15 @@
 -- The server reveals the piece when you inspect, and moves you on when you stop inspecting.
 Inspect = {}
 
-local cur -- { huntId, preview }
+local cur -- { hintId, preview }
 
 function Inspect.IsOpen() return cur ~= nil end
 
 --- Show the overlay. focus = entity to frame, or coords (vector3) when there is none.
-function Inspect.Show(huntId, data, focus, opts)
+function Inspect.Show(hintId, data, focus, opts)
     if cur or Hints.nuiOpen then return end
     opts = opts or {}
-    local c = { huntId = huntId, preview = opts.preview }
+    local c = { hintId = hintId, preview = opts.preview }
     cur = c
     local camOn = opts.camera ~= false and focus ~= nil
     if camOn then
@@ -61,19 +61,19 @@ function Inspect.Closed()
     Hud.Hold('reader', false)
     if c.preview then
         if c.preview ~= true then c.preview() end
-    elseif c.huntId then
-        TriggerServerEvent('blaze_hints:server:inspectDone', c.huntId)
+    elseif c.hintId then
+        TriggerServerEvent('blaze_hints:server:inspectDone', c.hintId)
     end
 end
 
 --- ox_target "Inspect" on the current step's spot
-function Inspect.Use(huntId, info, focus)
+function Inspect.Use(hintId, info, focus)
     if cur or Hints.nuiOpen then return end
     if info.locked then
         lib.notify({ title = info.label or Config.Text.inspect, description = info.lockedMessage or Config.Text.nothingHere, type = 'inform' })
         return
     end
-    local res = lib.callback.await('blaze_hints:inspect', false, huntId)
+    local res = lib.callback.await('blaze_hints:inspect', false, hintId)
     if not res then return end
-    Inspect.Show(huntId, res, focus, { camera = info.camera })
+    Inspect.Show(hintId, res, focus, { camera = info.camera })
 end

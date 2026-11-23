@@ -1,7 +1,7 @@
 -- blaze_hints server: startup, client events/callbacks, shop hooks, builder events, admin commands
 
 --- Admin check used by every admin command and every builder event / callback
-function IsHuntAdmin(src)
+function IsHintAdmin(src)
     if src == 0 then return true end -- server console
     if IsPlayerAceAllowed(src, ('group.%s'):format(Config.AdminGroup)) then return true end
     local ok, allowed = pcall(function() return exports.qbx_core:HasPermission(src, Config.AdminGroup) end)
@@ -9,8 +9,8 @@ function IsHuntAdmin(src)
 end
 
 CreateThread(function()
-    Hunts.EnsureTables()
-    Hunts.Load()
+    Hints.EnsureTables()
+    Hints.Load()
 end)
 
 ---------------------------------------------------------------------------
@@ -33,39 +33,39 @@ end)
 -- Step events (validated in Progress / Stash)
 ---------------------------------------------------------------------------
 
-RegisterNetEvent('blaze_hints:server:zoneEnter', function(huntId, index)
-    if type(huntId) ~= 'number' or type(index) ~= 'number' then return end
-    Progress.ZoneEntered(source, huntId, index)
+RegisterNetEvent('blaze_hints:server:zoneEnter', function(hintId, index)
+    if type(hintId) ~= 'number' or type(index) ~= 'number' then return end
+    Progress.ZoneEntered(source, hintId, index)
 end)
 
-RegisterNetEvent('blaze_hints:server:inspectDone', function(huntId)
-    if type(huntId) ~= 'number' then return end
-    Progress.InspectDone(source, huntId)
+RegisterNetEvent('blaze_hints:server:inspectDone', function(hintId)
+    if type(hintId) ~= 'number' then return end
+    Progress.InspectDone(source, hintId)
 end)
 
-RegisterNetEvent('blaze_hints:server:openStash', function(huntId)
-    if type(huntId) ~= 'number' then return end
-    Stash.Open(source, huntId)
+RegisterNetEvent('blaze_hints:server:openStash', function(hintId)
+    if type(hintId) ~= 'number' then return end
+    Stash.Open(source, hintId)
 end)
 
-lib.callback.register('blaze_hints:openPassword', function(src, huntId)
-    if type(huntId) ~= 'number' then return end
-    return Progress.OpenPassword(src, huntId)
+lib.callback.register('blaze_hints:openPassword', function(src, hintId)
+    if type(hintId) ~= 'number' then return end
+    return Progress.OpenPassword(src, hintId)
 end)
 
-lib.callback.register('blaze_hints:submitCode', function(src, huntId, input)
-    if type(huntId) ~= 'number' or type(input) ~= 'string' then return { ok = false, closed = true } end
-    return Progress.SubmitCode(src, huntId, input)
+lib.callback.register('blaze_hints:submitCode', function(src, hintId, input)
+    if type(hintId) ~= 'number' or type(input) ~= 'string' then return { ok = false, closed = true } end
+    return Progress.SubmitCode(src, hintId, input)
 end)
 
-lib.callback.register('blaze_hints:npcReply', function(src, huntId, lineIndex, replyIndex)
-    if type(huntId) ~= 'number' or type(lineIndex) ~= 'number' or type(replyIndex) ~= 'number' then return { close = true } end
-    return Progress.NpcReply(src, huntId, lineIndex, replyIndex)
+lib.callback.register('blaze_hints:npcReply', function(src, hintId, lineIndex, replyIndex)
+    if type(hintId) ~= 'number' or type(lineIndex) ~= 'number' or type(replyIndex) ~= 'number' then return { close = true } end
+    return Progress.NpcReply(src, hintId, lineIndex, replyIndex)
 end)
 
-lib.callback.register('blaze_hints:inspect', function(src, huntId)
-    if type(huntId) ~= 'number' then return end
-    return Progress.Inspect(src, huntId)
+lib.callback.register('blaze_hints:inspect', function(src, hintId)
+    if type(hintId) ~= 'number' then return end
+    return Progress.Inspect(src, hintId)
 end)
 
 lib.callback.register('blaze_hints:notes', function(src)
@@ -97,7 +97,7 @@ end)
 -- Builder (every event checks the admin group / ace here)
 ---------------------------------------------------------------------------
 
-local STEP_TYPES = { hint = true, inspect = true, npc = true, password = true, scene = true, stash = true }
+local STEP_TYPES = { message = true, inspect = true, npc = true, password = true, scene = true, stash = true }
 
 local function clean(v, depth)
     depth = depth or 0
@@ -116,10 +116,10 @@ local function clean(v, depth)
     end
 end
 
-local function sanitizeHunt(data)
+local function sanitizeHint(data)
     if type(data) ~= 'table' then return end
     local name = type(data.name) == 'string' and data.name:sub(1, 100) or ''
-    if name == '' then name = 'Unnamed hunt' end
+    if name == '' then name = 'Unnamed hint' end
     local steps = {}
     for _, s in ipairs(type(data.steps) == 'table' and data.steps or {}) do
         if #steps >= 100 then break end
@@ -136,42 +136,42 @@ local function sanitizeHunt(data)
     }
 end
 
-local function huntList()
+local function hintList()
     local list = {}
-    for id, hunt in pairs(Hunts.All()) do
-        list[#list + 1] = { id = id, name = hunt.name, enabled = hunt.enabled, autoStart = hunt.autoStart, steps = hunt.steps }
+    for id, hint in pairs(Hints.All()) do
+        list[#list + 1] = { id = id, name = hint.name, enabled = hint.enabled, autoStart = hint.autoStart, steps = hint.steps }
     end
     table.sort(list, function(a, b) return a.id < b.id end)
     return list
 end
 
-lib.callback.register('blaze_hints:builder:hunts', function(src)
-    if not IsHuntAdmin(src) then return end
-    return huntList()
+lib.callback.register('blaze_hints:builder:hints', function(src)
+    if not IsHintAdmin(src) then return end
+    return hintList()
 end)
 
 lib.callback.register('blaze_hints:builder:save', function(src, data)
-    if not IsHuntAdmin(src) then return end
-    local hunt = sanitizeHunt(data)
-    if not hunt then return end
-    if hunt.id and not Hunts.Get(hunt.id) then hunt.id = nil end
-    local id = Hunts.Save(hunt.id, hunt.name, hunt.enabled, hunt.steps, hunt.autoStart)
-    print(('[blaze_hints] %s saved hunt #%d "%s" (%d steps)'):format(GetPlayerName(src) or src, id, hunt.name, #hunt.steps))
-    return { id = id, hunts = huntList() }
+    if not IsHintAdmin(src) then return end
+    local hint = sanitizeHint(data)
+    if not hint then return end
+    if hint.id and not Hints.Get(hint.id) then hint.id = nil end
+    local id = Hints.Save(hint.id, hint.name, hint.enabled, hint.steps, hint.autoStart)
+    print(('[blaze_hints] %s saved hint #%d "%s" (%d steps)'):format(GetPlayerName(src) or src, id, hint.name, #hint.steps))
+    return { id = id, hints = hintList() }
 end)
 
 lib.callback.register('blaze_hints:builder:delete', function(src, id)
-    if not IsHuntAdmin(src) then return end
+    if not IsHintAdmin(src) then return end
     id = tonumber(id)
-    if not id or not Hunts.Delete(id) then return end
-    print(('[blaze_hints] %s deleted hunt #%d'):format(GetPlayerName(src) or src, id))
-    return { hunts = huntList() }
+    if not id or not Hints.Delete(id) then return end
+    print(('[blaze_hints] %s deleted hint #%d'):format(GetPlayerName(src) or src, id))
+    return { hints = hintList() }
 end)
 
 lib.callback.register('blaze_hints:builder:resetMe', function(src, id)
-    if not IsHuntAdmin(src) then return end
+    if not IsHintAdmin(src) then return end
     id = tonumber(id)
-    return id and Hunts.Get(id) and Progress.Reset(src, id) or false
+    return id and Hints.Get(id) and Progress.Reset(src, id) or false
 end)
 
 ---------------------------------------------------------------------------
@@ -180,12 +180,12 @@ end)
 
 local function reply(src, kind, text)
     if src == 0 then print('[blaze_hints] ' .. text) return end
-    Progress.Notify(src, kind, 'Hunts', text)
+    Progress.Notify(src, kind, 'Hints', text)
 end
 
 local function adminCommand(name, handler)
     RegisterCommand(name, function(src, args)
-        if not IsHuntAdmin(src) then
+        if not IsHintAdmin(src) then
             if src ~= 0 then reply(src, 'error', 'You are not allowed to use this.') end
             return
         end
@@ -193,51 +193,57 @@ local function adminCommand(name, handler)
     end, false)
 end
 
--- /huntbuilder [menu|nui]
+-- /hintbuilder [menu|nui]
 adminCommand(Config.BuilderCommand, function(src, args)
     if src == 0 then return reply(src, 'error', 'Run this in game') end
     local style = (args[1] == 'menu' or args[1] == 'nui') and args[1] or Config.BuilderStyle
     TriggerClientEvent('blaze_hints:client:openBuilder', src, style)
 end)
 
-adminCommand('huntlist', function(src)
-    local any = false
-    for id, hunt in pairs(Hunts.All()) do
-        any = true
-        reply(src, 'inform', ('#%d %s (%d steps, %s)'):format(id, hunt.name, #hunt.steps, hunt.enabled and 'enabled' or 'disabled'))
-    end
-    if not any then reply(src, 'inform', ('No hunts yet. Try /%s or /huntdemofull'):format(Config.BuilderCommand)) end
+-- /hintmanage: overview, players, reset / set step, duplicate, clean-up (server/manage.lua)
+adminCommand('hintmanage', function(src)
+    if src == 0 then return reply(src, 'error', 'Run this in game') end
+    TriggerClientEvent('blaze_hints:client:openManage', src)
 end)
 
--- /huntreset <huntId> [serverId]
-adminCommand('huntreset', function(src, args)
-    local huntId, target = tonumber(args[1]), tonumber(args[2]) or src
-    if not huntId or not Hunts.Get(huntId) then return reply(src, 'error', 'Usage: /huntreset <huntId> [serverId]') end
+adminCommand('hintlist', function(src)
+    local any = false
+    for id, hint in pairs(Hints.All()) do
+        any = true
+        reply(src, 'inform', ('#%d %s (%d steps, %s)'):format(id, hint.name, #hint.steps, hint.enabled and 'enabled' or 'disabled'))
+    end
+    if not any then reply(src, 'inform', ('No hints yet. Try /%s or /hintdemofull'):format(Config.BuilderCommand)) end
+end)
+
+-- /hintreset <hintId> [serverId]
+adminCommand('hintreset', function(src, args)
+    local hintId, target = tonumber(args[1]), tonumber(args[2]) or src
+    if not hintId or not Hints.Get(hintId) then return reply(src, 'error', 'Usage: /hintreset <hintId> [serverId]') end
     if target == 0 then return reply(src, 'error', 'Give a server id from the console') end
-    if Progress.Reset(target, huntId) then
-        reply(src, 'success', ('Hunt #%d reset for %d'):format(huntId, target))
+    if Progress.Reset(target, hintId) then
+        reply(src, 'success', ('Hint #%d reset for %d'):format(hintId, target))
     else
         reply(src, 'error', 'That player is not loaded')
     end
 end)
 
--- /hunttoggle <huntId>
-adminCommand('hunttoggle', function(src, args)
-    local hunt = Hunts.Get(args[1])
-    if not hunt then return reply(src, 'error', 'Usage: /hunttoggle <huntId>') end
-    Hunts.SetEnabled(hunt.id, not hunt.enabled)
-    reply(src, 'success', ('Hunt #%d is now %s'):format(hunt.id, Hunts.Get(hunt.id).enabled and 'enabled' or 'disabled'))
+-- /hinttoggle <hintId>
+adminCommand('hinttoggle', function(src, args)
+    local hint = Hints.Get(args[1])
+    if not hint then return reply(src, 'error', 'Usage: /hinttoggle <hintId>') end
+    Hints.SetEnabled(hint.id, not hint.enabled)
+    reply(src, 'success', ('Hint #%d is now %s'):format(hint.id, Hints.Get(hint.id).enabled and 'enabled' or 'disabled'))
 end)
 
--- /huntdelete <huntId>
-adminCommand('huntdelete', function(src, args)
+-- /hintdelete <hintId>
+adminCommand('hintdelete', function(src, args)
     local id = tonumber(args[1])
-    if not id or not Hunts.Delete(id) then return reply(src, 'error', 'Usage: /huntdelete <huntId>') end
-    reply(src, 'success', ('Hunt #%d deleted'):format(id))
+    if not id or not Hints.Delete(id) then return reply(src, 'error', 'Usage: /hintdelete <hintId>') end
+    reply(src, 'success', ('Hint #%d deleted'):format(id))
 end)
 
 ---------------------------------------------------------------------------
--- Demo hunts (quick tests around the admin)
+-- Demo hints (quick tests around the admin)
 ---------------------------------------------------------------------------
 
 local function around(src)
@@ -251,31 +257,31 @@ local function around(src)
     end, base
 end
 
--- /huntdemo: hints with pieces + a keypad 1.5 m in front of you
-adminCommand('huntdemo', function(src)
+-- /hintdemo: hints with pieces + a keypad 1.5 m in front of you
+adminCommand('hintdemo', function(src)
     if src == 0 then return reply(src, 'error', 'Run this in game') end
     local at, base = around(src)
-    local id = Hunts.Save(nil, 'Demo hunt', true, {
-        { type = 'hint', trigger = 'after_previous', piece = true,
+    local id = Hints.Save(nil, 'Demo hint', true, {
+        { type = 'message', trigger = 'after_previous', piece = true,
           text = 'Someone slipped a note in your pocket: "It starts with {piece}."' },
-        { type = 'hint', trigger = 'delay', delay = 20, piece = true,
+        { type = 'message', trigger = 'delay', delay = 20, piece = true,
           text = 'A text from an unknown number: "...and ends with {piece}."' },
-        { type = 'hint', trigger = 'zone', radius = 6.0, coords = base,
+        { type = 'message', trigger = 'zone', radius = 6.0, coords = base,
           text = 'You are close. There is a keypad around here.' },
         { type = 'password', inputType = 'keypad', codeMode = 'random', length = 4,
           wrongTries = 3, cooldown = 30, coords = at(0.0, 1.5), label = 'Use keypad' },
     }, true)
-    reply(src, 'success', ('Demo hunt #%d created. Keypad is 1.5 m in front of you.'):format(id))
+    reply(src, 'success', ('Demo hint #%d created. Keypad is 1.5 m in front of you.'):format(id))
 end)
 
--- /huntdemonpc [classic]: an NPC 2 m in front of you takes the code
-adminCommand('huntdemonpc', function(src, args)
+-- /hintdemonpc [classic]: an NPC 2 m in front of you takes the code
+adminCommand('hintdemonpc', function(src, args)
     if src == 0 then return reply(src, 'error', 'Run this in game') end
     local at = around(src)
-    local id = Hunts.Save(nil, 'Demo NPC hunt', true, {
-        { type = 'hint', trigger = 'after_previous', piece = true,
+    local id = Hints.Save(nil, 'Demo NPC hint', true, {
+        { type = 'message', trigger = 'after_previous', piece = true,
           text = 'A voicemail: "Vinnie wants the code. First half: {piece}."' },
-        { type = 'hint', trigger = 'delay', delay = 10, piece = true,
+        { type = 'message', trigger = 'delay', delay = 10, piece = true,
           text = 'A second voicemail: "Second half: {piece}. Don\'t keep him waiting."' },
         { type = 'npc', name = 'Vinnie', model = 'a_m_m_business_01', coords = at(0.0, 2.0, 180.0),
           scenario = 'WORLD_HUMAN_SMOKING', cinematic = args[1] ~= 'classic',
@@ -297,15 +303,15 @@ adminCommand('huntdemonpc', function(src, args)
         { type = 'password', inputType = 'keypad', codeMode = 'random', length = 4,
           wrongTries = 3, cooldown = 30, label = 'Give Vinnie the code' },
     }, true)
-    reply(src, 'success', ('Demo NPC hunt #%d created. Vinnie is 2 m in front of you.'):format(id))
+    reply(src, 'success', ('Demo NPC hint #%d created. Vinnie is 2 m in front of you.'):format(id))
 end)
 
--- /huntdemofull: note item, armored van scene with an inspect spot, NPC riddle, scrambled word, reward stash
-adminCommand('huntdemofull', function(src)
+-- /hintdemofull: note item, armored van scene with an inspect spot, NPC riddle, scrambled word, reward stash
+adminCommand('hintdemofull', function(src)
     if src == 0 then return reply(src, 'error', 'Run this in game') end
     local at, base = around(src)
-    local id = Hunts.Save(nil, 'Demo full hunt', true, {
-        { type = 'hint', trigger = 'after_previous', piece = true, deliver = 'note', title = 'A crumpled note',
+    local id = Hints.Save(nil, 'Demo full hint', true, {
+        { type = 'message', trigger = 'after_previous', piece = true, deliver = 'note', title = 'A crumpled note',
           text = 'They hit the van just up the road. The first letters are {piece}. Burn this.' },
         { type = 'scene', radius = 12.0, title = 'The van',
           text = 'The armored van. The guards look bored. Check the back.',
@@ -330,5 +336,5 @@ adminCommand('huntdemofull', function(src)
         { type = 'stash', label = 'Marla\'s lockbox', mode = 'reward', coords = base,
           rewards = { { name = 'money', count = 500 } } },
     }, true)
-    reply(src, 'success', ('Demo full hunt #%d created: van 14 m ahead, Marla 3 m right, lockbox where you stand.'):format(id))
+    reply(src, 'success', ('Demo full hint #%d created: van 14 m ahead, Marla 3 m right, lockbox where you stand.'):format(id))
 end)

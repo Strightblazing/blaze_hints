@@ -84,9 +84,9 @@
     <div id="builder" class="screen hidden">
         <div class="bd-window">
             <aside class="bd-side">
-                <div class="bd-brand">Hunt builder</div>
-                <select id="bd-hunt" class="inp"></select>
-                <input id="bd-name" class="inp" placeholder="Hunt name">
+                <div class="bd-brand">Hint builder</div>
+                <select id="bd-hint" class="inp"></select>
+                <input id="bd-name" class="inp" placeholder="Hint name">
                 <div class="bd-toggles">
                     <label class="chk"><input type="checkbox" id="bd-enabled"><span>Enabled</span></label>
                     <label class="chk"><input type="checkbox" id="bd-auto"><span>Starts for every character</span></label>
@@ -94,7 +94,7 @@
                 <div class="bd-steps" id="bd-steps"></div>
                 <div class="bd-add">
                     <select id="bd-addtype" class="inp">
-                        <option value="hint">Hint</option>
+                        <option value="message">Message</option>
                         <option value="inspect">Inspect spot</option>
                         <option value="npc">NPC</option>
                         <option value="password">Password</option>
@@ -104,8 +104,9 @@
                     <button id="bd-addbtn" class="btn primary">Add step</button>
                 </div>
                 <div class="bd-side-foot">
-                    <button id="bd-reset" class="btn ghost">Reset my progress</button>
-                    <button id="bd-delete" class="btn ghost danger">Delete hunt</button>
+                    <button id="bd-manage" class="btn ghost" title="Players, progress, clean-up">Manage</button>
+                    <button id="bd-reset" class="btn ghost" title="Start this hint over for yourself">Reset me</button>
+                    <button id="bd-delete" class="btn ghost danger">Delete hint</button>
                 </div>
             </aside>
             <main class="bd-main">
@@ -118,7 +119,7 @@
                         <button id="bd-place" class="btn">Place here</button>
                         <button id="bd-preview" class="btn">Preview</button>
                         <button id="bd-save" class="btn primary">Save</button>
-                        <button id="bd-hide" class="btn icon" title="Hide (walk around, /huntbuilder brings it back)">&#8212;</button>
+                        <button id="bd-hide" class="btn icon" title="Hide (walk around, /hintbuilder brings it back)">&#8212;</button>
                         <button id="bd-close" class="btn icon" title="Close">&#10005;</button>
                     </div>
                 </header>

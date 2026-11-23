@@ -73,29 +73,29 @@ end)
 -- Password (keypad / word entry)
 ---------------------------------------------------------------------------
 
-local passwordHunt, passwordPreview
+local passwordHint, passwordPreview
 
 local function openCodeScreen(info)
     Hints.OpenNui(info.inputType == 'word' and 'word' or 'keypad', info)
 end
 
-function Hints.OpenPassword(huntId)
+function Hints.OpenPassword(hintId)
     if Hints.nuiOpen then return end
-    local info = lib.callback.await('blaze_hints:openPassword', false, huntId)
+    local info = lib.callback.await('blaze_hints:openPassword', false, hintId)
     if not info then return end -- server already notified why (cooldown / too far / locked / wrong step)
-    passwordHunt, passwordPreview = huntId, nil
+    passwordHint, passwordPreview = hintId, nil
     openCodeScreen(info)
 end
 
 --- Builder preview: any code of the right length opens. onDone runs when the screen closes.
 function Hints.PreviewPassword(info, onDone)
-    passwordHunt, passwordPreview = nil, { length = info.length, onDone = onDone }
+    passwordHint, passwordPreview = nil, { length = info.length, onDone = onDone }
     openCodeScreen(info)
 end
 
 function Hints.PasswordClosed()
     local p = passwordPreview
-    passwordHunt, passwordPreview = nil, nil
+    passwordHint, passwordPreview = nil, nil
     if p and p.onDone then p.onDone() end
 end
 
@@ -105,8 +105,8 @@ RegisterNUICallback('keypadSubmit', function(data, cb)
         local ok = #data.code == passwordPreview.length
         return cb({ ok = ok, triesLeft = 3 })
     end
-    if not passwordHunt then return cb({ ok = false, closed = true }) end
-    local result = lib.callback.await('blaze_hints:submitCode', false, passwordHunt, data.code)
+    if not passwordHint then return cb({ ok = false, closed = true }) end
+    local result = lib.callback.await('blaze_hints:submitCode', false, passwordHint, data.code)
     cb(result or { ok = false, closed = true })
 end)
 
@@ -143,17 +143,17 @@ function Hints.OpenShop(shopId)
 end
 
 ---------------------------------------------------------------------------
--- Notes (/huntnotes): your own found pieces
+-- Notes (/hintnotes): your own found pieces
 ---------------------------------------------------------------------------
 
-RegisterCommand('huntnotes', function()
+RegisterCommand('hintnotes', function()
     local notes = lib.callback.await('blaze_hints:notes', false) or {}
     local options = {}
     for _, n in ipairs(notes) do
         local parts = {}
         for _, p in ipairs(n.pieces) do parts[#parts + 1] = ('%d/%d: %s'):format(p.n, p.total, p.value) end
         options[#options + 1] = {
-            title = n.hunt,
+            title = n.hint,
             description = #parts > 0 and table.concat(parts, '   ') or Config.Text.noNotes,
             icon = 'magnifying-glass',
             readOnly = true,

@@ -1,13 +1,13 @@
--- Steps: world pieces for the step each hunt is on (only this player sees them), plus each hunt's stash target.
+-- Steps: world pieces for the step each hint is on (only this player sees them), plus each hint's stash target.
 Steps = { active = {}, stash = {} }
--- active[huntId] = { info, zone, target, npcKey, sceneKey, prop }
--- stash[huntId]  = { info, target, sceneKey }
+-- active[hintId] = { info, zone, target, npcKey, sceneKey, prop }
+-- stash[hintId]  = { info, target, sceneKey }
 
 ---------------------------------------------------------------------------
 -- NPCs: local (non-networked) peds, spawned only near the player.
--- Keyed by hunt + NPC step, so the same ped stays when a password step it hosts starts.
+-- Keyed by hint + NPC step, so the same ped stays when a password step it hosts starts.
 ---------------------------------------------------------------------------
-local Npcs = {} -- [key] = { key, huntId, info, refs, point, ped, spawning, removed, pending }
+local Npcs = {} -- [key] = { key, hintId, info, refs, point, ped, spawning, removed, pending }
 
 local function deletePed(n)
     if n.ped then
@@ -19,7 +19,7 @@ local function deletePed(n)
     end
 end
 
---- Spawn a hunt NPC ped (also used by the builder preview)
+--- Spawn a hint NPC ped (also used by the builder preview)
 function Steps.CreateNpcPed(info)
     local c = info.coords
     local ok, model = pcall(lib.requestModel, info.model or 'a_m_m_business_01', 10000)
@@ -58,13 +58,13 @@ local function spawnPed(n)
                 icon = 'fa-solid fa-comments',
                 label = n.info.label or Config.Text.talk,
                 distance = 2.5,
-                onSelect = function() Dialog.Open(n.huntId, n.info, ped) end,
+                onSelect = function() Dialog.Open(n.hintId, n.info, ped) end,
             },
         })
     end)
 end
 
-local function useNpc(huntId, info)
+local function useNpc(hintId, info)
     local n = Npcs[info.key]
     if n then
         n.refs = n.refs + 1
@@ -74,14 +74,14 @@ local function useNpc(huntId, info)
     end
     local c = info.coords
     if type(c) ~= 'table' or not c.x then return end
-    n = { key = info.key, huntId = huntId, info = info, refs = 1 }
+    n = { key = info.key, hintId = hintId, info = info, refs = 1 }
     Npcs[info.key] = n
     n.point = lib.points.new({
         coords = vector3(c.x + 0.0, c.y + 0.0, c.z + 0.0),
         distance = Config.NpcSpawnDistance,
         onEnter = function() spawnPed(n) end,
         onExit = function()
-            if not Dialog.IsOpenFor(n.huntId, n.ped) then deletePed(n) end
+            if not Dialog.IsOpenFor(n.hintId, n.ped) then deletePed(n) end
         end,
     })
     return info.key
@@ -99,7 +99,7 @@ local function releaseNpc(key, force)
     if not n then return end
     n.refs = n.refs - 1
     if n.refs > 0 then return end
-    if not force and n.ped and Dialog.IsOpenFor(n.huntId, n.ped) then
+    if not force and n.ped and Dialog.IsOpenFor(n.hintId, n.ped) then
         n.pending = true -- still talking: removed when the dialog closes
         return
     end
@@ -107,15 +107,15 @@ local function releaseNpc(key, force)
 end
 
 --- Dialog closed: remove NPCs whose step ended mid-conversation
-function Steps.OnDialogClosed(huntId)
+function Steps.OnDialogClosed(hintId)
     for _, n in pairs(Npcs) do
-        if n.huntId == huntId and n.pending and n.refs <= 0 then removeNpc(n) end
+        if n.hintId == hintId and n.pending and n.refs <= 0 then removeNpc(n) end
     end
 end
 
 ---------------------------------------------------------------------------
 -- Where-to-look markers (Config.Markers): a floating icon over the spot, a thin ring on the ground.
--- Hidden while a close-up camera or a hunt screen is up.
+-- Hidden while a close-up camera or a hint screen is up.
 ---------------------------------------------------------------------------
 local Markers, markerLoop = {}, false
 
@@ -216,7 +216,7 @@ end
 local setup = {}
 
 -- hint with trigger 'zone': tell the server once when we walk in (the server checks our position)
-function setup.hint(huntId, info, a)
+function setup.message(hintId, info, a)
     if info.trigger ~= 'zone' then return end
     local coords = Hints.Vec(info.coords)
     if not coords then return end
@@ -228,13 +228,13 @@ function setup.hint(huntId, info, a)
         onEnter = function()
             if sent then return end
             sent = true
-            TriggerServerEvent('blaze_hints:server:zoneEnter', huntId, info.index)
+            TriggerServerEvent('blaze_hints:server:zoneEnter', hintId, info.index)
         end,
     })
 end
 
 -- scene: reach it (same as a hint zone, the server checks the distance)
-function setup.scene(huntId, info, a)
+function setup.scene(hintId, info, a)
     local coords = Hints.Vec(info.coords)
     if not coords then return end
     local sent = false
@@ -245,14 +245,14 @@ function setup.scene(huntId, info, a)
         onEnter = function()
             if sent then return end
             sent = true
-            TriggerServerEvent('blaze_hints:server:zoneEnter', huntId, info.index)
+            TriggerServerEvent('blaze_hints:server:zoneEnter', hintId, info.index)
         end,
     })
 end
 
 -- password: an ox_target spot that opens the keypad / word entry, and/or the NPC that hosts it
-function setup.password(huntId, info, a)
-    if info.npc then a.npcKey = useNpc(huntId, info.npc) end
+function setup.password(hintId, info, a)
+    if info.npc then a.npcKey = useNpc(hintId, info.npc) end
     local coords = Hints.Vec(info.coords)
     if info.marker then
         if coords then
@@ -263,21 +263,21 @@ function setup.password(huntId, info, a)
     end
     if not coords then return end
     local label = info.label or Config.Text.enterCode
-    a.target = addTarget(coords, ('blaze_hints_password_%d'):format(huntId), 'fa-solid fa-keyboard', label, function()
+    a.target = addTarget(coords, ('blaze_hints_password_%d'):format(hintId), 'fa-solid fa-keyboard', label, function()
         if info.locked then return lockedNotice(info, label) end
-        Hints.OpenPassword(huntId)
+        Hints.OpenPassword(hintId)
     end)
 end
 
 -- npc: a ped with "Talk"
-function setup.npc(huntId, info, a)
+function setup.npc(hintId, info, a)
     if not info.npc then return end
-    a.npcKey = useNpc(huntId, info.npc)
+    a.npcKey = useNpc(hintId, info.npc)
     if info.marker then a.marker = addMarker(Hints.Vec(info.npc.coords), 1.25, true) end -- over the NPC's head
 end
 
 -- inspect: a spot (optionally a prop) with "Inspect"
-function setup.inspect(huntId, info, a)
+function setup.inspect(hintId, info, a)
     local coords = Hints.Vec(info.coords)
     if not coords then return end
     if info.marker then a.marker = addMarker(coords) end
@@ -288,15 +288,15 @@ function setup.inspect(huntId, info, a)
             a.prop = obj
         end)
     end
-    a.target = addTarget(coords, ('blaze_hints_inspect_%d'):format(huntId), 'fa-solid fa-magnifying-glass', info.label or Config.Text.inspect, function()
+    a.target = addTarget(coords, ('blaze_hints_inspect_%d'):format(hintId), 'fa-solid fa-magnifying-glass', info.label or Config.Text.inspect, function()
         -- a prop of its own is framed; otherwise the spot itself (on a scene: behind the van, on the crate, ...)
-        Inspect.Use(huntId, info, a.prop or coords)
+        Inspect.Use(hintId, info, a.prop or coords)
     end)
 end
 
-RegisterNetEvent('blaze_hints:client:step', function(huntId, info)
-    local old = Steps.active[huntId]
-    Steps.active[huntId] = nil
+RegisterNetEvent('blaze_hints:client:step', function(hintId, info)
+    local old = Steps.active[hintId]
+    Steps.active[hintId] = nil
 
     if (Hints.nuiOpen == 'keypad' or Hints.nuiOpen == 'word') and (not info or info.type ~= 'password') then
         -- step moved on (or was reset) while the code screen was open: let the OPEN/locked animation finish
@@ -307,18 +307,18 @@ RegisterNetEvent('blaze_hints:client:step', function(huntId, info)
 
     -- set up the new step before clearing the old one, so a shared NPC / scene is kept instead of respawned
     if info then
-        Hints.Debug(('hunt %d step %d (%s)%s'):format(huntId, info.index, info.type, info.locked and ' locked' or ''))
+        Hints.Debug(('hint %d step %d (%s)%s'):format(hintId, info.index, info.type, info.locked and ' locked' or ''))
         local a = { info = info }
-        Steps.active[huntId] = a
+        Steps.active[hintId] = a
         if info.scene then a.sceneKey = Scenes.Use(info.scene) end
         local fn = setup[info.type]
-        if fn then fn(huntId, info, a) end
+        if fn then fn(hintId, info, a) end
     end
     clear(old)
 end)
 
 ---------------------------------------------------------------------------
--- Stash target (stays after the hunt is complete for permanent storage)
+-- Stash target (stays after the hint is complete for permanent storage)
 ---------------------------------------------------------------------------
 
 local function clearStash(s)
@@ -328,33 +328,33 @@ local function clearStash(s)
     removeMarker(s.marker)
 end
 
-RegisterNetEvent('blaze_hints:client:stash', function(huntId, info)
-    local old = Steps.stash[huntId]
-    Steps.stash[huntId] = nil
+RegisterNetEvent('blaze_hints:client:stash', function(hintId, info)
+    local old = Steps.stash[hintId]
+    Steps.stash[hintId] = nil
     if info then
         local s = { info = info }
-        Steps.stash[huntId] = s
+        Steps.stash[hintId] = s
         if info.scene then s.sceneKey = Scenes.Use(info.scene) end
         local coords = Hints.Vec(info.coords)
         if coords and info.marker then s.marker = addMarker(coords) end
         if coords then
-            s.target = addTarget(coords, ('blaze_hints_stash_%d'):format(huntId),
+            s.target = addTarget(coords, ('blaze_hints_stash_%d'):format(hintId),
                 info.unlocked and 'fa-solid fa-box-open' or 'fa-solid fa-lock',
                 info.unlocked and info.label or ('%s (%s)'):format(info.label, Config.Text.stashLocked),
-                function() TriggerServerEvent('blaze_hints:server:openStash', huntId) end, 1.0)
+                function() TriggerServerEvent('blaze_hints:server:openStash', hintId) end, 1.0)
         end
     end
     clearStash(old)
 end)
 
 function Steps.ClearAll()
-    for huntId, a in pairs(Steps.active) do
+    for hintId, a in pairs(Steps.active) do
         clear(a, true)
-        Steps.active[huntId] = nil
+        Steps.active[hintId] = nil
     end
-    for huntId, s in pairs(Steps.stash) do
+    for hintId, s in pairs(Steps.stash) do
         clearStash(s)
-        Steps.stash[huntId] = nil
+        Steps.stash[hintId] = nil
     end
     for _, n in pairs(Npcs) do removeNpc(n) end
     for id in pairs(Markers) do Markers[id] = nil end

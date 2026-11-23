@@ -7,7 +7,7 @@ local MAX_LENGTH = 12
 
 -- Code sources a password step can use. Pieces are split across the steps (between the previous
 -- password step and this one) that carry one of the chosen kinds.
-Codes.SourceKinds = { 'hint', 'note', 'inspect', 'npc', 'receipt', 'scramble' }
+Codes.SourceKinds = { 'message', 'note', 'inspect', 'npc', 'receipt', 'scramble' }
 
 function Codes.Length(step)
     return math.max(1, math.min(math.floor(tonumber(step.length) or 4), MAX_LENGTH))
@@ -99,8 +99,8 @@ end
 --- Piece kinds a step can carry
 local function stepKinds(step)
     local kinds = {}
-    if step.type == 'hint' and step.piece then
-        kinds[1] = step.deliver == 'note' and 'note' or 'hint'
+    if step.type == 'message' and step.piece then
+        kinds[1] = step.deliver == 'note' and 'note' or 'message'
     elseif step.type == 'inspect' and step.piece then
         kinds[1] = step.deliver == 'note' and 'note' or 'inspect'
     elseif step.type == 'npc' and type(step.dialog) == 'table' then

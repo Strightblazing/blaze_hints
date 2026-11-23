@@ -4,13 +4,14 @@ Config.Debug = false               -- draws hint zones / target zones and prints
 
 Config.CinematicDialog = true      -- true = letterbox + camera on NPC face + HUD hidden; false = small dialog panel bottom-right
 Config.AdminGroup = 'admin'        -- checked as ace 'group.<AdminGroup>' or qbx_core:HasPermission(src, AdminGroup)
-Config.BuilderCommand = 'huntbuilder' -- /huntbuilder (admins). '/huntbuilder menu' or '/huntbuilder nui' picks a style for that time
+Config.BuilderCommand = 'hintbuilder' -- /hintbuilder (admins). '/hintbuilder menu' or '/hintbuilder nui' picks a style for that time
 Config.BuilderStyle = 'nui'        -- 'nui' = full builder screen | 'menu' = ox_lib menus and inputs (Lation UI look when lation_ui is running)
 Config.UseLationUI = true          -- menu builder: use lation_ui menus / inputs when it is started
 Config.DefaultCooldown = 30        -- seconds locked out after MaxWrongTries wrong codes
 Config.MaxWrongTries = 3
-Config.ResetOnFail = false         -- default for password steps: true = after the lockout the hunt goes back and the player gets a new random code
+Config.ResetOnFail = false         -- default for password steps: true = after the lockout the hint goes back and the player gets a new random code
 Config.Accent = '#f26a21'
+Config.VersionCheck = true         -- startup: compare with the latest GitHub release (fxmanifest repository)
 
 -- Time locks
 Config.TimeZone = nil              -- real_time / date_window locks: nil = the server's own clock, or a UTC offset in hours (e.g. -5, 1, 10)
@@ -23,13 +24,13 @@ Config.ZoneSlack = 5.0             -- extra metres allowed past a hint zone / sc
 Config.NpcDistance = 5.0           -- from an NPC when picking a reply
 Config.InspectDistance = 5.0       -- from an inspect spot
 Config.StashDistance = 5.0         -- from a stash
-Config.HintGap = 1500              -- ms between back-to-back "after previous" hints
+Config.MessageGap = 1500              -- ms between back-to-back "after previous" hints
 
 -- Spawning (client)
-Config.NpcSpawnDistance = 80.0     -- hunt NPCs only exist on your screen inside this range
+Config.NpcSpawnDistance = 80.0     -- hint NPCs only exist on your screen inside this range
 Config.SceneSpawnDistance = 150.0  -- private world scenes only exist inside this range
 
--- Hunt cameras (inspect close-up and cinematic NPC dialog): hide characters that would clip into the shot.
+-- Hint cameras (inspect close-up and cinematic NPC dialog): hide characters that would clip into the shot.
 -- This is ONLY on the screen of the player looking: everyone else still sees everyone. When your buddy
 -- inspects a clue, you never turn invisible for anyone.
 Config.Camera = {
@@ -39,7 +40,7 @@ Config.Camera = {
 }
 
 -- Where-to-look markers: a floating icon over the current inspect spot, keypad and (unlocked) stash.
--- Only the hunter on that step sees it. Each step can turn it off in the builder ("Show a marker").
+-- Only the player on that step sees it. Each step can turn it off in the builder ("Show a marker").
 Config.Markers = {
     enabled = true,
     distance = 25.0,               -- shown inside this range
@@ -53,7 +54,7 @@ Config.Markers = {
     steps = { inspect = true, password = true, stash = true, npc = false },
 }
 
--- Your HUD: hidden while hunt screens are open. The GTA HUD and minimap always hide during the cinematic dialog / camera.
+-- Your HUD: hidden while hint screens are open. The GTA HUD and minimap always hide during the cinematic dialog / camera.
 -- It only shows again if it was on before, and only when nothing else here is still hiding it.
 Config.Hud = {
     hideInDialog = true,           -- dialog (both styles)
@@ -150,9 +151,9 @@ Config.Text = {
     lockedOut     = 'Too many wrong tries. Locked for %d seconds.',
     lockedReset   = 'Too many wrong tries. The trail went cold. Start over: you will need a new code.',
     cooldown      = 'Locked. Try again in %d seconds.',
-    huntComplete  = 'Hunt complete',
+    hintComplete  = 'Hint complete',
     enterCode     = 'Enter code',
-    notesTitle    = 'Hunt notes',
+    notesTitle    = 'Hint notes',
     noNotes       = 'You have not found any code pieces yet.',
     talk          = 'Talk',
     inspect       = 'Inspect',

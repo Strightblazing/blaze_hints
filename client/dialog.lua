@@ -2,11 +2,11 @@
 -- cinematic = letterbox + camera on the NPC's face + HUD hidden; classic = small panel bottom-right over gameplay.
 Dialog = {}
 
-local cur -- { huntId, npc, ped, line, busy, cinematic }
+local cur -- { hintId, npc, ped, line, busy, cinematic }
 
 function Dialog.IsOpen() return cur ~= nil end
-function Dialog.IsOpenFor(huntId, ped)
-    return cur ~= nil and cur.huntId == huntId and (not ped or cur.ped == ped)
+function Dialog.IsOpenFor(hintId, ped)
+    return cur ~= nil and cur.hintId == hintId and (not ped or cur.ped == ped)
 end
 
 local function lineIndexById(id)
@@ -40,13 +40,13 @@ function Dialog.ShowText(text)
 end
 
 --- preview = { onClose = fn } for the builder: replies are played locally, nothing goes to the server
-function Dialog.Open(huntId, npc, ped, preview)
+function Dialog.Open(hintId, npc, ped, preview)
     if cur or Hints.nuiOpen then return end
     if not ped or not DoesEntityExist(ped) or not npc.lines or #npc.lines == 0 then return end
     local me = PlayerPedId()
     if IsEntityDead(me) or LocalPlayer.state.isDead then return end
 
-    cur = { huntId = huntId, npc = npc, ped = ped, cinematic = npc.cinematic, preview = preview }
+    cur = { hintId = hintId, npc = npc, ped = ped, cinematic = npc.cinematic, preview = preview }
 
     TaskTurnPedToFaceEntity(me, ped, 1200)
     TaskLookAtEntity(ped, me, -1, 2048, 3)
@@ -74,7 +74,7 @@ function Dialog.Close()
     if c.preview then
         if c.preview.onClose then c.preview.onClose(c.after) end
     else
-        Steps.OnDialogClosed(c.huntId)
+        Steps.OnDialogClosed(c.hintId)
     end
 end
 
@@ -113,17 +113,17 @@ RegisterNUICallback('dialogReply', function(data, cb)
     -- everything else is decided by the server
     local c = cur
     c.busy = true
-    local res = lib.callback.await('blaze_hints:npcReply', false, c.huntId, c.line, index) or { close = true }
+    local res = lib.callback.await('blaze_hints:npcReply', false, c.hintId, c.line, index) or { close = true }
     if cur ~= c then return end
     c.busy = false
 
     if res.line then return Dialog.ShowText(res.line) end
 
-    local huntId = c.huntId
+    local hintId = c.hintId
     Dialog.Close()
     if res.openPassword then
         Wait(200)
-        Hints.OpenPassword(huntId)
+        Hints.OpenPassword(hintId)
     elseif res.shop then
         Wait(200)
         Hints.OpenShop(res.shop)

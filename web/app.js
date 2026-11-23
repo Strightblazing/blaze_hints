@@ -292,8 +292,8 @@
     }
 
     // ---------------- Builder ----------------
-    const B = { hunts: [], hunt: null, sel: -1, dirty: false, presets: [], defaults: {}, cinematicDefault: true };
-    const TYPE_LABEL = { hint: 'Hint', inspect: 'Inspect spot', npc: 'NPC', password: 'Password', scene: 'World scene', stash: 'Personal stash' };
+    const B = { hints: [], hint: null, sel: -1, dirty: false, presets: [], defaults: {}, cinematicDefault: true };
+    const TYPE_LABEL = { message: 'Message', inspect: 'Inspect spot', npc: 'NPC', password: 'Password', scene: 'World scene', stash: 'Personal stash' };
     const clone = (o) => JSON.parse(JSON.stringify(o));
     const uid = () => 'b' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
     const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
@@ -310,10 +310,10 @@
         return s;
     }
 
-    function loadHunt(h) {
-        B.hunt = h ? clone(h) : { id: null, name: 'New hunt', enabled: true, autoStart: true, steps: [] };
-        B.hunt.steps = (Array.isArray(B.hunt.steps) ? B.hunt.steps : []).map(normalizeStep);
-        B.sel = B.hunt.steps.length ? 0 : -1;
+    function loadHint(h) {
+        B.hint = h ? clone(h) : { id: null, name: 'New hint', enabled: true, autoStart: true, steps: [] };
+        B.hint.steps = (Array.isArray(B.hint.steps) ? B.hint.steps : []).map(normalizeStep);
+        B.sel = B.hint.steps.length ? 0 : -1;
         setDirty(false);
         renderBuilder();
     }
@@ -326,7 +326,7 @@
 
     function stepSummary(s) {
         switch (s.type) {
-            case 'hint': return `${s.trigger || 'after_previous'}${s.piece ? ' · piece' : ''}${s.deliver === 'note' ? ' · note' : ''}`;
+            case 'message': return `${s.trigger || 'after_previous'}${s.piece ? ' · piece' : ''}${s.deliver === 'note' ? ' · note' : ''}`;
             case 'inspect': return `${s.label || 'Inspect'}${s.piece ? ' · piece' : ''}`;
             case 'npc': return `${s.name || 'Stranger'}${s.coords ? '' : ' · not placed'}`;
             case 'password': return `${s.inputType || 'keypad'} · ${s.codeMode || 'random'}`;
@@ -337,28 +337,28 @@
     }
 
     function renderSide() {
-        const sel = $('bd-hunt');
+        const sel = $('bd-hint');
         sel.innerHTML = '';
-        B.hunts.forEach((h) => {
+        B.hints.forEach((h) => {
             const o = el('option', '', `#${h.id} ${h.name}`);
             o.value = h.id;
             sel.appendChild(o);
         });
-        const n = el('option', '', '+ New hunt');
+        const n = el('option', '', '+ New hint');
         n.value = 'new';
         sel.appendChild(n);
-        sel.value = B.hunt.id ? String(B.hunt.id) : 'new';
+        sel.value = B.hint.id ? String(B.hint.id) : 'new';
 
-        $('bd-name').value = B.hunt.name || '';
-        $('bd-enabled').checked = B.hunt.enabled !== false;
-        $('bd-auto').checked = B.hunt.autoStart !== false;
-        $('bd-reset').disabled = !B.hunt.id;
-        $('bd-delete').disabled = !B.hunt.id;
+        $('bd-name').value = B.hint.name || '';
+        $('bd-enabled').checked = B.hint.enabled !== false;
+        $('bd-auto').checked = B.hint.autoStart !== false;
+        $('bd-reset').disabled = !B.hint.id;
+        $('bd-delete').disabled = !B.hint.id;
 
         const list = $('bd-steps');
         list.innerHTML = '';
-        if (!B.hunt.steps.length) list.appendChild(el('div', 'bd-empty', 'No steps yet. Add one below.'));
-        B.hunt.steps.forEach((s, i) => {
+        if (!B.hint.steps.length) list.appendChild(el('div', 'bd-empty', 'No steps yet. Add one below.'));
+        B.hint.steps.forEach((s, i) => {
             const row = el('div', `bd-step${i === B.sel ? ' sel' : ''}`);
             row.appendChild(el('div', 'n', String(i + 1)));
             const t = el('div', 't');
@@ -381,7 +381,7 @@
 
     function moveStep(i, d) {
         const j = i + d;
-        const steps = B.hunt.steps;
+        const steps = B.hint.steps;
         if (j < 0 || j >= steps.length) return;
         [steps[i], steps[j]] = [steps[j], steps[i]];
         if (B.sel === i) B.sel = j; else if (B.sel === j) B.sel = i;
@@ -400,8 +400,8 @@
             return;
         }
         deleteArmed = null;
-        B.hunt.steps.splice(i, 1);
-        if (B.sel >= B.hunt.steps.length) B.sel = B.hunt.steps.length - 1;
+        B.hint.steps.splice(i, 1);
+        if (B.sel >= B.hint.steps.length) B.sel = B.hint.steps.length - 1;
         touch();
         renderBuilder();
     }
@@ -495,7 +495,7 @@
     }
 
     const opt = (pairs) => pairs;
-    const SOURCES = [['hint', 'Hint pieces'], ['note', 'Note item'], ['inspect', 'Inspect spot'], ['npc', 'NPC riddle'], ['receipt', 'Shop receipt'], ['scramble', 'Scramble']];
+    const SOURCES = [['message', 'Message pieces'], ['note', 'Note item'], ['inspect', 'Inspect spot'], ['npc', 'NPC riddle'], ['receipt', 'Shop receipt'], ['scramble', 'Scramble']];
 
     // "Show a marker": default (config) / on / off
     function markerField(s) {
@@ -504,7 +504,7 @@
             options: opt([['default', 'Config default'], ['on', 'Show a marker'], ['off', 'No marker']]),
             show: (v) => (v === true ? 'on' : v === false ? 'off' : 'default'),
             parse: (v) => (v === 'on' ? true : v === 'off' ? false : undefined),
-        }), 'A floating ? over the spot, only for the hunter on this step');
+        }), 'A floating ? over the spot, only for the player on this step');
     }
 
     // ---- cards ----
@@ -512,7 +512,7 @@
         const c = card(TYPE_LABEL[s.type] || 'Step', false);
         const placeLabel = s.type === 'npc' ? 'NPC' : 'Spot';
         switch (s.type) {
-            case 'hint':
+            case 'message':
                 c.appendChild(fld('Title', input(s, 'title', 'text', { placeholder: 'New hint' })));
                 c.appendChild(fld('Text', input(s, 'text', 'textarea'), '{piece} = where the code piece goes'));
                 c.appendChild(row(
@@ -572,7 +572,7 @@
                     fld('Mode', input(s, 'mode', 'select', { def: 'permanent', rerender: false, options: opt([['permanent', 'Permanent storage'], ['reward', 'One-time reward box']]) }))));
                 c.appendChild(row(fld('Slots', input(s, 'slots', 'number', { min: 1, def: B.defaults.slots })), fld('Max weight (g)', input(s, 'maxWeight', 'number', { min: 1000, def: B.defaults.maxWeight }))));
                 c.appendChild(fld('Unlock message (optional)', input(s, 'unlockText', 'text')));
-                c.appendChild(input(s, 'showWhileLocked', 'check', { label: 'Show it (locked) during the hunt', def: true }));
+                c.appendChild(input(s, 'showWhileLocked', 'check', { label: 'Show it (locked) during the hint', def: true }));
                 c.appendChild(markerField(s));
                 c.appendChild(coordsLine(s, 'coords', 'Stash'));
                 break;
@@ -582,7 +582,7 @@
 
     function codeCard(s) {
         const c = card('Code source', false);
-        s.sources = isObj(s.sources) ? s.sources : { hint: true, note: true, inspect: true, npc: true, receipt: true };
+        s.sources = isObj(s.sources) ? s.sources : { message: true, note: true, inspect: true, npc: true, receipt: true };
         const grid = el('div', 'grid-checks');
         SOURCES.forEach(([k, l]) => grid.appendChild(input(s.sources, k, 'check', { label: l })));
         c.appendChild(grid);
@@ -595,7 +595,7 @@
             fld('Wrong tries', input(s, 'wrongTries', 'number', { min: 1, def: B.defaults.wrongTries })),
             fld('Cooldown (s)', input(s, 'cooldown', 'number', { min: 0, def: B.defaults.cooldown })),
         ));
-        c.appendChild(input(s, 'resetOnFail', 'check', { label: 'After the lockout, reset the hunt with a new code' }));
+        c.appendChild(input(s, 'resetOnFail', 'check', { label: 'After the lockout, reset the hint with a new code' }));
         return c;
     }
 
@@ -685,7 +685,7 @@
             fld('Guards (0-4)', input(sc, 'guards', 'number', { min: 0, max: 4, def: 0 })),
             fld('Guard mode', input(sc, 'guardMode', 'select', { def: 'calm', rerender: false, options: opt([['calm', 'Calm'], ['hostile', 'Hostile'], ['dressing', 'Set dressing']]) })),
         ));
-        c.appendChild(fld('Who sees it', input(sc, 'visibility', 'select', { def: 'private', rerender: false, options: opt([['private', 'Only the hunter (private)'], ['shared', 'Everyone (shared)']]) })));
+        c.appendChild(fld('Who sees it', input(sc, 'visibility', 'select', { def: 'private', rerender: false, options: opt([['private', 'Only the player on the step (private)'], ['shared', 'Everyone (shared)']]) })));
         const fx = el('div', 'grid-checks');
         [['smoke', 'Smoke'], ['sparks', 'Sparks'], ['flare', 'Flare']].forEach(([k, l]) => fx.appendChild(input(sc.effects, k, 'check', { label: l })));
         c.appendChild(fld('Effects', fx));
@@ -782,14 +782,14 @@
         const wrap = $('bd-cards');
         const scroll = wrap.scrollTop;
         wrap.innerHTML = '';
-        const s = B.hunt.steps[B.sel];
+        const s = B.hint.steps[B.sel];
         if (!s) {
-            $('bd-kicker').textContent = B.hunt.id ? `Hunt #${B.hunt.id}` : 'New hunt';
+            $('bd-kicker').textContent = B.hint.id ? `Hint #${B.hint.id}` : 'New hint';
             $('bd-title').textContent = 'No step selected';
             wrap.appendChild(el('div', 'bd-empty', 'Add a step on the left. Steps run in order for each character.'));
             return;
         }
-        $('bd-kicker').textContent = `Step ${B.sel + 1} of ${B.hunt.steps.length}`;
+        $('bd-kicker').textContent = `Step ${B.sel + 1} of ${B.hint.steps.length}`;
         $('bd-title').textContent = TYPE_LABEL[s.type] || s.type;
         wrap.appendChild(generalCard(s));
         if (s.type === 'password') wrap.appendChild(codeCard(s));
@@ -806,37 +806,41 @@
     }
 
     function builderOpen(d) {
-        B.hunts = Array.isArray(d.hunts) ? d.hunts : [];
+        B.hints = Array.isArray(d.hints) ? d.hints : [];
         B.presets = d.presets || [];
         B.defaults = d.defaults || {};
         B.cinematicDefault = d.cinematicDefault !== false;
-        if (!d.resume || !B.hunt) {
-            loadHunt(B.hunts[0]);
+        const wanted = d.selectId ? B.hints.find((h) => h.id === d.selectId) : null;
+        if (wanted) {
+            loadHint(wanted); // "Edit in the builder" from the manage menu
+        } else if (!d.resume || !B.hint) {
+            loadHint(B.hints[0]);
         } else {
             renderBuilder();
         }
         show('builder');
     }
+    $('bd-manage').onclick = () => post('builderManage');
 
-    $('bd-hunt').onchange = (e) => {
+    $('bd-hint').onchange = (e) => {
         const v = e.target.value;
-        loadHunt(v === 'new' ? null : B.hunts.find((h) => String(h.id) === v));
+        loadHint(v === 'new' ? null : B.hints.find((h) => String(h.id) === v));
     };
-    $('bd-name').oninput = (e) => { B.hunt.name = e.target.value; touch(); };
-    $('bd-enabled').onchange = (e) => { B.hunt.enabled = e.target.checked; touch(); };
-    $('bd-auto').onchange = (e) => { B.hunt.autoStart = e.target.checked; touch(); };
+    $('bd-name').oninput = (e) => { B.hint.name = e.target.value; touch(); };
+    $('bd-enabled').onchange = (e) => { B.hint.enabled = e.target.checked; touch(); };
+    $('bd-auto').onchange = (e) => { B.hint.autoStart = e.target.checked; touch(); };
     $('bd-addbtn').onclick = () => {
         const type = $('bd-addtype').value;
         const s = { type, uid: uid() };
         if (type === 'npc') s.dialog = [{ id: 'start', text: '', replies: [{ label: 'Bye.', action: 'end' }] }];
-        if (type === 'password') s.sources = { hint: true, note: true, inspect: true, npc: true, receipt: true };
-        B.hunt.steps.push(s);
-        B.sel = B.hunt.steps.length - 1;
+        if (type === 'password') s.sources = { message: true, note: true, inspect: true, npc: true, receipt: true };
+        B.hint.steps.push(s);
+        B.sel = B.hint.steps.length - 1;
         touch();
         renderBuilder();
     };
     $('bd-place').onclick = async () => {
-        const s = B.hunt.steps[B.sel];
+        const s = B.hint.steps[B.sel];
         if (!s) return;
         const pos = await post('builderPlace');
         if (!pos) return;
@@ -845,38 +849,38 @@
         renderBuilder();
     };
     $('bd-preview').onclick = () => {
-        const s = B.hunt.steps[B.sel];
+        const s = B.hint.steps[B.sel];
         if (s) post('builderPreview', { step: s });
     };
     $('bd-save').onclick = async () => {
-        const res = await post('builderSave', { hunt: B.hunt });
+        const res = await post('builderSave', { hint: B.hint });
         if (!res) return;
-        B.hunts = res.hunts || B.hunts;
-        B.hunt.id = res.id;
-        const saved = B.hunts.find((h) => h.id === res.id);
+        B.hints = res.hints || B.hints;
+        B.hint.id = res.id;
+        const saved = B.hints.find((h) => h.id === res.id);
         const sel = B.sel;
-        if (saved) loadHunt(saved);
-        B.sel = Math.min(sel, B.hunt.steps.length - 1);
+        if (saved) loadHint(saved);
+        B.sel = Math.min(sel, B.hint.steps.length - 1);
         setDirty(false);
         renderBuilder();
     };
-    let deleteHuntArmed = false;
+    let deleteHintArmed = false;
     $('bd-delete').onclick = async () => {
-        if (!B.hunt.id) return;
-        if (!deleteHuntArmed) {
-            deleteHuntArmed = true;
+        if (!B.hint.id) return;
+        if (!deleteHintArmed) {
+            deleteHintArmed = true;
             $('bd-delete').textContent = 'Click again';
-            setTimeout(() => { deleteHuntArmed = false; $('bd-delete').textContent = 'Delete hunt'; }, 3000);
+            setTimeout(() => { deleteHintArmed = false; $('bd-delete').textContent = 'Delete hint'; }, 3000);
             return;
         }
-        deleteHuntArmed = false;
-        $('bd-delete').textContent = 'Delete hunt';
-        const res = await post('builderDelete', { id: B.hunt.id });
+        deleteHintArmed = false;
+        $('bd-delete').textContent = 'Delete hint';
+        const res = await post('builderDelete', { id: B.hint.id });
         if (!res) return;
-        B.hunts = res.hunts || [];
-        loadHunt(B.hunts[0]);
+        B.hints = res.hints || [];
+        loadHint(B.hints[0]);
     };
-    $('bd-reset').onclick = () => { if (B.hunt.id) post('builderResetMe', { id: B.hunt.id }); };
+    $('bd-reset').onclick = () => { if (B.hint.id) post('builderResetMe', { id: B.hint.id }); };
     $('bd-hide').onclick = () => post('builderHide');
     $('bd-close').onclick = () => close();
 

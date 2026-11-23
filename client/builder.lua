@@ -1,4 +1,4 @@
--- Builder: build hunts in game (admins). Two styles (Config.BuilderStyle, or '/huntbuilder menu|nui'):
+-- Builder: build hints in game (admins). Two styles (Config.BuilderStyle, or '/hintbuilder menu|nui'):
 --   nui  = the full builder screen (web/), with Place here / Preview / Save
 --   menu = ox_lib context menus + input dialogs, Lation UI look when lation_ui is running (Config.UseLationUI)
 -- Every save / delete is checked against the admin group on the server; this file only edits a draft.
@@ -17,8 +17,8 @@ local function here()
     return { x = round(c.x), y = round(c.y), z = round(c.z), w = round(GetEntityHeading(ped), 1) }
 end
 
-local function fetchHunts()
-    return lib.callback.await('blaze_hints:builder:hunts', false) or {}
+local function fetchHints()
+    return lib.callback.await('blaze_hints:builder:hints', false) or {}
 end
 
 local function notify(kind, title, text)
@@ -84,7 +84,7 @@ function Builder.Preview(step, onDone)
     local t = step.type
     local text = tostring(step.text or ''):gsub('{piece}', '??')
 
-    if t == 'hint' then
+    if t == 'message' then
         notify('inform', step.title or Config.Text.newHint, text ~= '' and text or '(no text)')
         finishIn(p.sceneKey and 20 or 3)
     elseif t == 'npc' then
@@ -151,11 +151,13 @@ end
 -- NUI builder
 ---------------------------------------------------------------------------
 
-local function openNui(resume)
+--- resume = keep the page's draft; selectId = open that hint (from the manage menu)
+local function openNui(resume, selectId)
     if Hints.nuiOpen and Hints.nuiOpen ~= 'builder' then return end
     Hints.OpenNui('builder', {
-        hunts = fetchHunts(),
+        hints = fetchHints(),
         resume = resume,
+        selectId = selectId,
         presets = presetList(),
         cinematicDefault = Config.CinematicDialog,
         defaults = {
@@ -166,26 +168,26 @@ local function openNui(resume)
 end
 
 function Builder.Closed()
-    -- the page keeps its draft: /huntbuilder brings it back as it was
+    -- the page keeps its draft: /hintbuilder brings it back as it was
 end
 
 RegisterNUICallback('builderPlace', function(_, cb) cb(here()) end)
 
 RegisterNUICallback('builderSave', function(data, cb)
-    local res = lib.callback.await('blaze_hints:builder:save', false, data and data.hunt)
-    if res then notify('success', 'Hunt saved', ('#%d is live now.'):format(res.id)) else notify('error', 'Hunt not saved', 'Not allowed or invalid data.') end
+    local res = lib.callback.await('blaze_hints:builder:save', false, data and data.hint)
+    if res then notify('success', 'Hint saved', ('#%d is live now.'):format(res.id)) else notify('error', 'Hint not saved', 'Not allowed or invalid data.') end
     cb(res or false)
 end)
 
 RegisterNUICallback('builderDelete', function(data, cb)
     local res = lib.callback.await('blaze_hints:builder:delete', false, data and data.id)
-    if res then notify('success', 'Hunt deleted', '') end
+    if res then notify('success', 'Hint deleted', '') end
     cb(res or false)
 end)
 
 RegisterNUICallback('builderResetMe', function(data, cb)
     local ok = lib.callback.await('blaze_hints:builder:resetMe', false, data and data.id)
-    notify(ok and 'success' or 'error', 'Your progress', ok and 'Reset. The hunt starts again for you.' or 'Save the hunt first.')
+    notify(ok and 'success' or 'error', 'Your progress', ok and 'Reset. The hint starts again for you.' or 'Save the hint first.')
     cb(ok or false)
 end)
 
@@ -262,9 +264,9 @@ local Menu = {}
 
 local function opt(list) local o = {} for _, v in ipairs(list) do o[#o + 1] = { value = v[1], label = v[2] } end return o end
 
-local TYPE_LABEL = { hint = 'Hint', inspect = 'Inspect spot', npc = 'NPC', password = 'Password', scene = 'World scene', stash = 'Personal stash' }
-local TYPES = opt({ { 'hint', 'Hint' }, { 'inspect', 'Inspect spot' }, { 'npc', 'NPC' }, { 'password', 'Password' }, { 'scene', 'World scene' }, { 'stash', 'Personal stash' } })
-local TYPE_ICON = { hint = 'lightbulb', inspect = 'magnifying-glass', npc = 'user', password = 'keyboard', scene = 'truck', stash = 'box-open' }
+local TYPE_LABEL = { message = 'Message', inspect = 'Inspect spot', npc = 'NPC', password = 'Password', scene = 'World scene', stash = 'Personal stash' }
+local TYPES = opt({ { 'message', 'Message' }, { 'inspect', 'Inspect spot' }, { 'npc', 'NPC' }, { 'password', 'Password' }, { 'scene', 'World scene' }, { 'stash', 'Personal stash' } })
+local TYPE_ICON = { message = 'lightbulb', inspect = 'magnifying-glass', npc = 'user', password = 'keyboard', scene = 'truck', stash = 'box-open' }
 
 local function cinematicShow(v) return v == true and 'cinematic' or (v == false and 'classic' or 'default') end
 local function cinematicParse(v) if v == 'cinematic' then return true elseif v == 'classic' then return false end end
@@ -277,13 +279,13 @@ local function daysParse(v)
 end
 
 local MARKER = { key = 'marker', type = 'select', label = 'Where-to-look marker',
-    description = 'A floating ? over the spot, only for the hunter on this step',
+    description = 'A floating ? over the spot, only for the player on this step',
     show = function(v) return v == true and 'on' or (v == false and 'off' or 'default') end,
     parse = function(v) if v == 'on' then return true elseif v == 'off' then return false end end,
     options = opt({ { 'default', 'Config default' }, { 'on', 'Show a marker' }, { 'off', 'No marker' } }) }
 
 local FIELDS = {
-    hint = {
+    message = {
         { key = 'title', type = 'input', label = 'Title', description = 'Empty = "New hint"' },
         { key = 'text', type = 'textarea', label = 'Text', description = '{piece} = where the code piece goes' },
         { key = 'trigger', type = 'select', label = 'Trigger', default = 'after_previous',
@@ -332,7 +334,7 @@ local FIELDS = {
         { key = 'maxWeight', type = 'number', label = 'Max weight (g)', min = 1000, default = Config.Stash.maxWeight },
         { key = 'mode', type = 'select', label = 'Mode', default = 'permanent',
           options = opt({ { 'permanent', 'Permanent personal storage' }, { 'reward', 'One-time reward box' } }) },
-        { key = 'showWhileLocked', type = 'checkbox', label = 'Show it (locked) during the hunt', default = true },
+        { key = 'showWhileLocked', type = 'checkbox', label = 'Show it (locked) during the hint', default = true },
         { key = 'unlockText', type = 'input', label = 'Unlock message (optional)' },
         MARKER,
     },
@@ -343,7 +345,7 @@ local FIELDS = {
         { key = 'length', type = 'number', label = 'Length', min = 1, max = 12, default = 4 },
         { key = 'wrongTries', type = 'number', label = 'Wrong tries', min = 1, default = Config.MaxWrongTries },
         { key = 'cooldown', type = 'number', label = 'Cooldown (seconds)', min = 0, default = Config.DefaultCooldown },
-        { key = 'resetOnFail', type = 'checkbox', label = 'Reset the hunt with a new code after the lockout', default = Config.ResetOnFail },
+        { key = 'resetOnFail', type = 'checkbox', label = 'Reset the hint with a new code after the lockout', default = Config.ResetOnFail },
     },
     timeLock = {
         { key = 'mode', type = 'select', label = 'Mode', default = 'off',
@@ -354,7 +356,7 @@ local FIELDS = {
         { key = 'days', type = 'input', label = 'Days (real time)', description = '1 = Mon ... 7 = Sun, e.g. 5,6,7. Empty = every day', show = daysShow, parse = daysParse },
         { key = 'seconds', type = 'number', label = 'Timer (seconds)', min = 0 },
         { key = 'timerMode', type = 'select', label = 'Timer', default = 'wait',
-          options = opt({ { 'wait', 'Wait: opens after the timer' }, { 'expire', 'Expire: too late after the timer (hunt goes back)' } }) },
+          options = opt({ { 'wait', 'Wait: opens after the timer' }, { 'expire', 'Expire: too late after the timer (hint goes back)' } }) },
         { key = 'lockedMessage', type = 'input', label = 'Locked message', description = 'NPC line / inspect text while locked' },
         { key = 'hideWhileLocked', type = 'checkbox', label = 'Hide NPC / spot while locked' },
         { key = 'comeBack', type = 'checkbox', label = 'Send a "come back at X" hint' },
@@ -366,13 +368,13 @@ local FIELDS = {
         { key = 'guardMode', type = 'select', label = 'Guards', default = 'calm',
           options = opt({ { 'calm', 'Calm' }, { 'hostile', 'Hostile' }, { 'dressing', 'Set dressing' } }) },
         { key = 'visibility', type = 'select', label = 'Who sees it', default = 'private',
-          options = opt({ { 'private', 'Only the hunter (private)' }, { 'shared', 'Everyone (shared)' } }) },
+          options = opt({ { 'private', 'Only the player on the step (private)' }, { 'shared', 'Everyone (shared)' } }) },
         { key = 'searchRadius', type = 'number', label = 'Search area blip radius (0 = none)', min = 0, default = 0 },
         { key = 'searchSeconds', type = 'number', label = 'Search blip time (s, 0 = while on the step)', min = 0, default = 0 },
     },
 }
 
-local SOURCES = { { 'hint', 'Hint pieces' }, { 'note', 'Note item' }, { 'inspect', 'Inspect spot' }, { 'npc', 'NPC riddle' }, { 'receipt', 'Shop receipt' }, { 'scramble', 'Scramble (shows the letters)' } }
+local SOURCES = { { 'message', 'Message pieces' }, { 'note', 'Note item' }, { 'inspect', 'Inspect spot' }, { 'npc', 'NPC riddle' }, { 'receipt', 'Shop receipt' }, { 'scramble', 'Scramble (shows the letters)' } }
 local EFFECTS = { { 'smoke', 'Smoke' }, { 'sparks', 'Sparks' }, { 'flare', 'Flare' } }
 
 --- Edit fields of obj with one input dialog. Returns true when saved.
@@ -414,7 +416,7 @@ local function checkboxes(title, tbl, list)
 end
 
 local function summary(step)
-    if step.type == 'hint' then return (step.trigger or 'after_previous') .. (step.piece and ' · piece' or '') end
+    if step.type == 'message' then return (step.trigger or 'after_previous') .. (step.piece and ' · piece' or '') end
     if step.type == 'npc' then return (step.name or 'Stranger') .. (Util.Vec(step.coords) and '' or ' · not placed') end
     if step.type == 'password' then return (step.inputType or 'keypad') .. ' · ' .. (step.codeMode or 'random') end
     if step.type == 'scene' then return type(step.scene) == 'table' and step.scene.preset or 'no preset' end
@@ -424,66 +426,67 @@ end
 
 function Menu.Open()
     detectLation()
-    local hunts = fetchHunts()
+    local hints = fetchHints()
     local options = {}
-    for _, h in ipairs(hunts) do
+    for _, h in ipairs(hints) do
         options[#options + 1] = {
             title = ('#%d %s'):format(h.id, h.name), icon = 'map',
             description = ('%d steps · %s'):format(#h.steps, h.enabled and 'enabled' or 'disabled'),
-            arrow = true, onSelect = function() Menu.Hunt(h) end,
+            arrow = true, onSelect = function() Menu.Hint(h) end,
         }
     end
-    options[#options + 1] = { title = 'New hunt', icon = 'plus', onSelect = function()
-        Menu.Hunt({ name = 'New hunt', enabled = true, autoStart = true, steps = {} })
+    options[#options + 1] = { title = 'New hint', icon = 'plus', onSelect = function()
+        Menu.Hint({ name = 'New hint', enabled = true, autoStart = true, steps = {} })
     end }
+    options[#options + 1] = { title = 'Manage hints', icon = 'list-check', description = 'Players, progress, clean-up', onSelect = function() Builder.Manage() end }
     options[#options + 1] = { title = 'Open the builder screen', icon = 'table-columns', onSelect = function() openNui(false) end }
-    UI.menu({ id = 'bh_main', title = 'Hunt builder', options = options })
+    UI.menu({ id = 'bh_main', title = 'Hint builder', options = options })
 end
 
-function Menu.Hunt(h)
+function Menu.Hint(h)
     UI.menu({
-        id = 'bh_hunt', title = h.id and ('#%d %s'):format(h.id, h.name) or h.name, menu = 'bh_main',
+        id = 'bh_hint', title = h.id and ('#%d %s'):format(h.id, h.name) or h.name, menu = 'bh_main',
         onBack = function() Menu.Open() end,
         options = {
             { title = 'Name and settings', icon = 'pen', description = ('%s · %s'):format(h.enabled and 'enabled' or 'disabled', h.autoStart and 'auto start' or 'no auto start'),
               onSelect = function()
-                  editFields('Hunt', h, {
+                  editFields('Hint', h, {
                       { key = 'name', type = 'input', label = 'Name' },
                       { key = 'enabled', type = 'checkbox', label = 'Enabled' },
                       { key = 'autoStart', type = 'checkbox', label = 'Starts for every character' },
                   })
-                  Menu.Hunt(h)
+                  Menu.Hint(h)
               end },
             { title = ('Steps (%d)'):format(#h.steps), icon = 'list-ol', arrow = true, onSelect = function() Menu.Steps(h) end },
             { title = 'Add step', icon = 'plus', onSelect = function()
-                local v = UI.input('Add step', { { type = 'select', label = 'Type', options = TYPES, default = 'hint' } })
+                local v = UI.input('Add step', { { type = 'select', label = 'Type', options = TYPES, default = 'message' } })
                 if v and v[1] then
                     h.steps[#h.steps + 1] = { type = v[1], uid = ('b%d%d'):format(GetGameTimer() % 100000, math.random(10, 99)) }
                     return Menu.Step(h, #h.steps)
                 end
-                Menu.Hunt(h)
+                Menu.Hint(h)
             end },
-            { title = 'Save hunt', icon = 'floppy-disk', description = 'Goes live for everyone right away', onSelect = function()
+            { title = 'Save hint', icon = 'floppy-disk', description = 'Goes live for everyone right away', onSelect = function()
                 local res = lib.callback.await('blaze_hints:builder:save', false, h)
                 if res then
                     h.id = res.id
-                    notify('success', 'Hunt saved', ('#%d is live now.'):format(res.id))
+                    notify('success', 'Hint saved', ('#%d is live now.'):format(res.id))
                 else
-                    notify('error', 'Hunt not saved', 'Not allowed or invalid data.')
+                    notify('error', 'Hint not saved', 'Not allowed or invalid data.')
                 end
-                Menu.Hunt(h)
+                Menu.Hint(h)
             end },
             { title = 'Reset my progress', icon = 'rotate-left', disabled = not h.id, onSelect = function()
                 local ok = lib.callback.await('blaze_hints:builder:resetMe', false, h.id)
                 notify(ok and 'success' or 'error', 'Your progress', ok and 'Reset.' or 'Could not reset.')
-                Menu.Hunt(h)
+                Menu.Hint(h)
             end },
-            { title = 'Delete hunt', icon = 'trash', disabled = not h.id, onSelect = function()
-                if UI.confirm('Delete hunt', ('Delete "%s" and everyone\'s progress on it?'):format(h.name)) then
+            { title = 'Delete hint', icon = 'trash', disabled = not h.id, onSelect = function()
+                if UI.confirm('Delete hint', ('Delete "%s" and everyone\'s progress on it?'):format(h.name)) then
                     lib.callback.await('blaze_hints:builder:delete', false, h.id)
                     return Menu.Open()
                 end
-                Menu.Hunt(h)
+                Menu.Hint(h)
             end },
         },
     })
@@ -498,7 +501,7 @@ function Menu.Steps(h)
         }
     end
     if #options == 0 then options[1] = { title = 'No steps yet', readOnly = true } end
-    UI.menu({ id = 'bh_steps', title = 'Steps', menu = 'bh_hunt', onBack = function() Menu.Hunt(h) end, options = options })
+    UI.menu({ id = 'bh_steps', title = 'Steps', menu = 'bh_hint', onBack = function() Menu.Hint(h) end, options = options })
 end
 
 function Menu.Step(h, i)
@@ -649,10 +652,155 @@ function Menu.Line(h, i, l)
 end
 
 ---------------------------------------------------------------------------
--- Open (the server checks the admin group before sending this)
+-- Manage hints (/hintmanage): everything here is checked against the admin group on the server
+---------------------------------------------------------------------------
+
+local Manage = {}
+local function call(name, ...) return lib.callback.await('blaze_hints:manage:' .. name, false, ...) end
+local GREEN, AMBER, GREY, RED = '#3DDC84', '#F0A93B', '#8F99A5', '#E5484D'
+
+function Manage.Open()
+    detectLation()
+    local list = call('overview')
+    if not list then return notify('error', 'Manage hints', 'Not allowed.') end
+    local options = {}
+    for _, h in ipairs(list) do
+        options[#options + 1] = {
+            title = ('#%d %s'):format(h.id, h.name),
+            description = ('%s · %d steps · %d started · %d finished · %d online'):format(
+                h.enabled and 'On' or 'Off', h.steps, h.started, h.done, h.online),
+            icon = h.enabled and 'circle-check' or 'circle-pause', iconColor = h.enabled and GREEN or GREY,
+            arrow = true, onSelect = function() Manage.Hint(h.id) end,
+        }
+    end
+    if #list == 0 then options[1] = { title = 'No hints yet', readOnly = true } end
+    options[#options + 1] = { title = 'Clean up', icon = 'broom', iconColor = AMBER, description = 'Demo hints, progress of deleted characters', arrow = true, onSelect = Manage.Clean }
+    options[#options + 1] = { title = 'Open the builder', icon = 'table-columns', onSelect = function() openNui(true) end }
+    UI.menu({ id = 'bh_manage', title = 'Manage hints', options = options })
+end
+
+function Manage.Hint(id)
+    local h
+    for _, x in ipairs(call('overview') or {}) do if x.id == id then h = x end end
+    if not h then return Manage.Open() end
+    local back = function() Manage.Hint(id) end
+    UI.menu({
+        id = 'bh_manage_hint', title = ('#%d %s'):format(h.id, h.name), menu = 'bh_manage', onBack = Manage.Open,
+        options = {
+            { title = 'Players', icon = 'users', arrow = true,
+              description = ('%d started · %d finished · %d online now'):format(h.started, h.done, h.online),
+              onSelect = function() Manage.Players(id) end },
+            { title = h.enabled and 'Turn off' or 'Turn on', icon = h.enabled and 'pause' or 'play',
+              iconColor = h.enabled and AMBER or GREEN,
+              description = h.enabled and 'Hidden for everyone, progress is kept' or 'Live for everyone again',
+              onSelect = function() call('toggle', id) back() end },
+            { title = 'Edit in the builder', icon = 'pen-to-square', onSelect = function() openNui(false, id) end },
+            { title = 'Duplicate', icon = 'copy', description = 'A copy, turned off, to change safely', onSelect = function()
+                local newId = call('duplicate', id)
+                if newId then notify('success', 'Duplicated', ('Copy saved as #%d (off).'):format(newId)) end
+                Manage.Open()
+            end },
+            { title = 'Reset everyone\'s progress', icon = 'rotate-left', iconColor = AMBER, onSelect = function()
+                if UI.confirm('Reset everyone', ('Everyone starts "%s" over with a new code. Stash contents stay.'):format(h.name)) then
+                    local n = call('resetAll', id)
+                    notify('success', 'Reset', ('%d player(s) start over.'):format(tonumber(n) or 0))
+                end
+                back()
+            end },
+            { title = 'Delete', icon = 'trash', iconColor = RED, onSelect = function()
+                if UI.confirm('Delete hint', ('Delete "%s" and everyone\'s progress on it? This cannot be undone.'):format(h.name)) then
+                    call('delete', id)
+                    notify('success', 'Deleted', h.name)
+                    return Manage.Open()
+                end
+                back()
+            end },
+        },
+    })
+end
+
+function Manage.Players(id)
+    local res = call('players', id)
+    if not res then return Manage.Open() end
+    local options = {}
+    for _, p in ipairs(res.list) do
+        local where = p.completed and ('Finished%s'):format(p.stash == 1 and ' · stash unlocked' or (p.stash == 2 and ' · reward taken' or ''))
+            or ('Step %d of %d'):format(p.step, res.steps)
+        options[#options + 1] = {
+            title = p.name and ('%s (%s)'):format(p.name, p.citizenid) or p.citizenid,
+            description = where .. (p.online and ' · online' or ''),
+            icon = p.completed and 'flag-checkered' or 'user', iconColor = p.online and GREEN or GREY,
+            arrow = true, onSelect = function() Manage.Player(id, p, res.steps) end,
+        }
+    end
+    if #options == 0 then options[1] = { title = 'Nobody has started this hint yet', readOnly = true } end
+    UI.menu({ id = 'bh_manage_players', title = 'Players', menu = 'bh_manage_hint', onBack = function() Manage.Hint(id) end, options = options })
+end
+
+function Manage.Player(id, p, steps)
+    local back = function() Manage.Players(id) end
+    UI.menu({
+        id = 'bh_manage_player', title = p.name or p.citizenid, menu = 'bh_manage_players', onBack = back,
+        options = {
+            { title = 'Put on step...', icon = 'forward-step', description = 'New code for that stretch (good for testing)', onSelect = function()
+                local v = UI.input('Put on step', { { type = 'number', label = ('Step (1-%d)'):format(steps), min = 1, max = steps, default = p.step } })
+                if v and v[1] then
+                    local ok = call('setStep', id, p.citizenid, v[1])
+                    notify(ok and 'success' or 'error', 'Progress', ok and ('Now on step %d.'):format(v[1]) or 'Could not change it.')
+                end
+                back()
+            end },
+            { title = 'Reset progress', icon = 'rotate-left', iconColor = AMBER, onSelect = function()
+                if UI.confirm('Reset progress', ('%s starts this hint over with a new code.'):format(p.name or p.citizenid)) then
+                    call('resetPlayer', id, p.citizenid)
+                    notify('success', 'Reset', p.name or p.citizenid)
+                end
+                back()
+            end },
+        },
+    })
+end
+
+function Manage.Clean()
+    UI.menu({
+        id = 'bh_manage_clean', title = 'Clean up', menu = 'bh_manage', onBack = Manage.Open,
+        options = {
+            { title = 'Delete demo hints', icon = 'trash', description = 'Every hint whose name starts with "Demo "', onSelect = function()
+                if UI.confirm('Delete demo hints', 'Delete every hint named "Demo ..." and its progress?') then
+                    notify('success', 'Clean up', ('%d demo hint(s) deleted.'):format(tonumber(call('cleanDemos')) or 0))
+                end
+                Manage.Open()
+            end },
+            { title = 'Remove progress of deleted characters', icon = 'user-slash', onSelect = function()
+                if UI.confirm('Clean up progress', 'Remove hint progress of characters that no longer exist?') then
+                    local n = tonumber(call('cleanOrphans')) or 0
+                    if n < 0 then notify('error', 'Clean up', 'No players table found.')
+                    else notify('success', 'Clean up', ('%d row(s) removed.'):format(n)) end
+                end
+                Manage.Clean()
+            end },
+        },
+    })
+end
+
+function Builder.Manage() Manage.Open() end
+
+RegisterNUICallback('builderManage', function(_, cb)
+    cb(1)
+    Hints.CloseNui()
+    Wait(100)
+    Manage.Open()
+end)
+
+---------------------------------------------------------------------------
+-- Open (the server checks the admin group before sending these)
 ---------------------------------------------------------------------------
 
 RegisterNetEvent('blaze_hints:client:openBuilder', function(style)
     if style == 'menu' then return Menu.Open() end
     openNui(true)
+end)
+
+RegisterNetEvent('blaze_hints:client:openManage', function()
+    Manage.Open()
 end)

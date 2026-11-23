@@ -1,5 +1,5 @@
--- Progress: per character (citizenid) state for every hunt, plus the step engine.
--- Players[src] = { citizenid, rows = { [huntId] = row }, scenes = { [huntId] = sceneKey }, pendingReceipt = {...} }
+-- Progress: per character (citizenid) state for every hint, plus the step engine.
+-- Players[src] = { citizenid, rows = { [hintId] = row }, scenes = { [hintId] = sceneKey }, pendingReceipt = {...} }
 Progress = { players = {} }
 local Players = Progress.players
 
@@ -40,9 +40,9 @@ local function decodeJson(raw)
     if ok and type(t) == 'table' then return t end
 end
 
-local function newRow(citizenid, huntId)
+local function newRow(citizenid, hintId)
     return {
-        citizenid = citizenid, hunt_id = huntId, step_index = 1, code = nil, pieces = {},
+        citizenid = citizenid, hint_id = hintId, step_index = 1, code = nil, pieces = {},
         wrong_tries = 0, cooldown_until = 0, completed = false, unlocked_stash = 0,
         step_started = now(), token = 0,
     }
@@ -51,14 +51,14 @@ end
 function Progress.SaveRow(row)
     MySQL.query([[
         INSERT INTO `blaze_hints_progress`
-            (`citizenid`, `hunt_id`, `step_index`, `code`, `pieces_found`, `wrong_tries`, `cooldown_until`, `completed`, `unlocked_stash`, `step_started`)
+            (`citizenid`, `hint_id`, `step_index`, `code`, `pieces_found`, `wrong_tries`, `cooldown_until`, `completed`, `unlocked_stash`, `step_started`)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
             `step_index` = VALUES(`step_index`), `code` = VALUES(`code`), `pieces_found` = VALUES(`pieces_found`),
             `wrong_tries` = VALUES(`wrong_tries`), `cooldown_until` = VALUES(`cooldown_until`),
             `completed` = VALUES(`completed`), `unlocked_stash` = VALUES(`unlocked_stash`), `step_started` = VALUES(`step_started`)
     ]], {
-        row.citizenid, row.hunt_id, row.step_index,
+        row.citizenid, row.hint_id, row.step_index,
         row.code and json.encode(row.code) or nil,
         json.encode(row.pieces or {}),
         row.wrong_tries, row.cooldown_until,
@@ -137,8 +137,8 @@ end
 -- Client sync (never includes the code)
 ---------------------------------------------------------------------------
 
-local function sendStep(src, huntId, info)
-    TriggerClientEvent('blaze_hints:client:step', src, huntId, info)
+local function sendStep(src, hintId, info)
+    TriggerClientEvent('blaze_hints:client:step', src, hintId, info)
 end
 
 local function lockedText(step)
@@ -151,7 +151,7 @@ local function hideWhileLocked(step)
 end
 
 --- What the client needs to show an NPC: no clue texts (they can carry code pieces)
-local function npcInfo(huntId, step, locked)
+local function npcInfo(hintId, step, locked)
     local lines = {}
     if locked then
         lines[1] = { text = lockedText(step), replies = {} }
@@ -167,7 +167,7 @@ local function npcInfo(huntId, step, locked)
     local cinematic = step.cinematic
     if cinematic == nil then cinematic = Config.CinematicDialog end
     return {
-        key = ('%d:%s'):format(huntId, tostring(step.uid)), -- same key = same ped (kept when the hosted password step starts)
+        key = ('%d:%s'):format(hintId, tostring(step.uid)), -- same key = same ped (kept when the hosted password step starts)
         name = step.name or 'Stranger',
         model = step.model or 'a_m_m_business_01',
         coords = step.coords,
@@ -191,8 +191,8 @@ local function spotTable(v)
     return v and { x = v.x, y = v.y, z = v.z } or nil
 end
 
-local function clientInfo(src, hunt, index, step, locked)
-    local info = { index = index, total = #hunt.steps, type = step.type, huntName = hunt.name }
+local function clientInfo(src, hint, index, step, locked)
+    local info = { index = index, total = #hint.steps, type = step.type, hintName = hint.name }
     local hide = locked and hideWhileLocked(step)
 
     if locked then
@@ -200,46 +200,46 @@ local function clientInfo(src, hunt, index, step, locked)
         info.lockedMessage = lockedText(step)
     end
 
-    if step.type == 'hint' then
+    if step.type == 'message' then
         info.trigger = step.trigger or 'after_previous'
         info.coords = step.coords
         info.radius = tonumber(step.radius) or 5.0
     elseif step.type == 'password' then
-        local host = hostNpc(hunt.steps, index)
+        local host = hostNpc(hint.steps, index)
         if host then
-            if not hide then info.npc = npcInfo(hunt.id, host, locked) end
+            if not hide then info.npc = npcInfo(hint.id, host, locked) end
         elseif not hide then
-            info.coords = spotTable(Progress.SpotFor(hunt.steps, index))
+            info.coords = spotTable(Progress.SpotFor(hint.steps, index))
         end
         info.label = step.label
         info.inputType = step.inputType or 'keypad'
     elseif step.type == 'npc' then
-        if not hide then info.npc = npcInfo(hunt.id, step, locked) end
+        if not hide then info.npc = npcInfo(hint.id, step, locked) end
     elseif step.type == 'inspect' then
         if not hide then
-            info.coords = spotTable(Progress.SpotFor(hunt.steps, index))
+            info.coords = spotTable(Progress.SpotFor(hint.steps, index))
             info.label = step.label or Config.Text.inspect
             info.camera = step.camera ~= false
             info.prop = step.prop ~= '' and step.prop or nil
         end
     elseif step.type == 'scene' then
-        info.coords = spotTable(Progress.SpotFor(hunt.steps, index))
+        info.coords = spotTable(Progress.SpotFor(hint.steps, index))
         info.radius = tonumber(step.radius) or 15.0
     end
 
     -- where-to-look marker: the step's own choice, else the config default for its type (never while locked)
     if not locked then
-        local markerType = (step.type == 'password' and hostNpc(hunt.steps, index)) and 'npc' or step.type
+        local markerType = (step.type == 'password' and hostNpc(hint.steps, index)) and 'npc' or step.type
         info.marker = Progress.MarkerOn(step, markerType)
     end
 
     -- world scene (not while locked)
     if not locked then
-        local owner, ownerIndex = sceneOwner(hunt.steps, index)
+        local owner, ownerIndex = sceneOwner(hint.steps, index)
         if owner then
             local scene = Progress.SceneInfo(owner.scene, owner)
             if scene then
-                scene.key = ('scene:%d:%s'):format(hunt.id, tostring(owner.uid))
+                scene.key = ('scene:%d:%s'):format(hint.id, tostring(owner.uid))
                 if scene.visibility == 'shared' then
                     scene.netIds = Scenes.Acquire(src, scene.key, owner.scene, owner)
                 end
@@ -255,17 +255,17 @@ end
 -- Lookups
 ---------------------------------------------------------------------------
 
---- Returns row, step, hunt if the player is still on step `index` (and `token`, when given)
-local function current(src, huntId, index, token)
+--- Returns row, step, hint if the player is still on step `index` (and `token`, when given)
+local function current(src, hintId, index, token)
     local state = Players[src]
-    local row = state and state.rows[huntId]
-    local hunt = Hunts.Get(huntId)
-    if not row or not hunt or not hunt.enabled or row.completed then return end
+    local row = state and state.rows[hintId]
+    local hint = Hints.Get(hintId)
+    if not row or not hint or not hint.enabled or row.completed then return end
     if index and row.step_index ~= index then return end
     if token and row.token ~= token then return end
-    local step = hunt.steps[row.step_index]
+    local step = hint.steps[row.step_index]
     if not step then return end
-    return row, step, hunt
+    return row, step, hint
 end
 Progress.Current = current
 
@@ -293,7 +293,7 @@ local function ensureCode(row, steps)
     if not stale then return false end
     row.code = { step = p, value = Codes.ForStep(step), fixed = fixed or nil, input = inputType }
     row.pieces = {}
-    debug(('new code for %s hunt %s step %d'):format(row.citizenid, row.hunt_id, p))
+    debug(('new code for %s hint %s step %d'):format(row.citizenid, row.hint_id, p))
     return true
 end
 
@@ -312,9 +312,9 @@ end
 
 --- Reveal the piece step `index` carries as `kind`. Marks it found and sends the "Code piece found X/Y" notify.
 ---@return string? piece, integer? position, integer? total
-local function revealPiece(src, row, hunt, index, kind)
+local function revealPiece(src, row, hint, index, kind)
     if not row.code then return end
-    local piece, k, total, key = Codes.PieceFor(hunt.steps, row.code.value, index, kind)
+    local piece, k, total, key = Codes.PieceFor(hint.steps, row.code.value, index, kind)
     if not piece then return end
     local known = false
     for _, existing in ipairs(row.pieces) do if existing == key then known = true break end end
@@ -322,17 +322,17 @@ local function revealPiece(src, row, hunt, index, kind)
         row.pieces[#row.pieces + 1] = key
         Progress.SaveRow(row)
     end
-    local found, all = piecesFound(row, hunt.steps)
+    local found, all = piecesFound(row, hint.steps)
     notify(src, 'success', Config.Text.pieceFound, Config.Text.pieceCount:format(found, all))
     return piece, k, total
 end
 
 --- Give a note / receipt item. Falls back to a notify if it does not fit.
-local function giveItem(src, item, title, text, huntName)
+local function giveItem(src, item, title, text, hintName)
     local metadata = {
         label = title,
         text = text,
-        description = title .. (huntName and (' · ' .. huntName) or ''),
+        description = title .. (hintName and (' · ' .. hintName) or ''),
         kind = item == Config.Items.receipt and 'receipt' or 'note',
     }
     local ok = exports.ox_inventory:AddItem(src, item, 1, metadata)
@@ -347,12 +347,12 @@ end
 -- Step engine
 ---------------------------------------------------------------------------
 
-local function releaseScene(src, huntId, keep)
+local function releaseScene(src, hintId, keep)
     local state = Players[src]
     if not state then return end
-    local old = state.scenes[huntId]
+    local old = state.scenes[hintId]
     if old and old ~= keep then Scenes.Release(src, old) end
-    state.scenes[huntId] = keep
+    state.scenes[hintId] = keep
 end
 
 --- Back to the start of this stretch (the step after the previous password step) with a new code
@@ -364,23 +364,23 @@ local function resetSegment(row, steps)
     Progress.SaveRow(row)
 end
 
-function Progress.StartStep(src, huntId)
+function Progress.StartStep(src, hintId)
     local state = Players[src]
-    local row = state and state.rows[huntId]
-    local hunt = Hunts.Get(huntId)
+    local row = state and state.rows[hintId]
+    local hint = Hints.Get(hintId)
     if row then row.token = row.token + 1 end
 
-    if not row or not hunt or not hunt.enabled or row.completed then
-        sendStep(src, huntId, nil)
-        releaseScene(src, huntId, nil)
-        Stash.Sync(src, huntId)
+    if not row or not hint or not hint.enabled or row.completed then
+        sendStep(src, hintId, nil)
+        releaseScene(src, hintId, nil)
+        Stash.Sync(src, hintId)
         return
     end
 
-    local steps = hunt.steps
+    local steps = hint.steps
     if row.step_index < 1 then row.step_index = 1 end
     if row.step_index > #steps then
-        return Progress.Complete(src, huntId)
+        return Progress.Complete(src, hintId)
     end
 
     if ensureCode(row, steps) then Progress.SaveRow(row) end
@@ -393,7 +393,7 @@ function Progress.StartStep(src, huntId)
     if expired then
         notify(src, 'error', Config.Text.tooLate, Config.Text.tooLateMsg)
         resetSegment(row, steps)
-        return Progress.StartStep(src, huntId)
+        return Progress.StartStep(src, hintId)
     end
     row.lockOpen = open
     if not open and comeBack and step.timeLock.comeBack and row.comeBackFor ~= index then
@@ -401,106 +401,106 @@ function Progress.StartStep(src, huntId)
         notify(src, 'inform', Config.Text.comeBack, comeBack)
     end
 
-    debug(('src %d hunt %d -> step %d (%s)%s'):format(src, huntId, index, tostring(step.type), open and '' or ' [locked]'))
+    debug(('src %d hint %d -> step %d (%s)%s'):format(src, hintId, index, tostring(step.type), open and '' or ' [locked]'))
 
-    if step.type == 'hint' then
-        releaseScene(src, huntId, nil)
-        if not open then sendStep(src, huntId, nil) return Stash.Sync(src, huntId) end -- queued until it opens
+    if step.type == 'message' then
+        releaseScene(src, hintId, nil)
+        if not open then sendStep(src, hintId, nil) return Stash.Sync(src, hintId) end -- queued until it opens
         local trigger = step.trigger or 'after_previous'
         if trigger == 'zone' and vec(step.coords) then
-            local info = clientInfo(src, hunt, index, step, false)
-            releaseScene(src, huntId, info.scene and info.scene.visibility == 'shared' and info.scene.key or nil)
-            sendStep(src, huntId, info)
+            local info = clientInfo(src, hint, index, step, false)
+            releaseScene(src, hintId, info.scene and info.scene.visibility == 'shared' and info.scene.key or nil)
+            sendStep(src, hintId, info)
         else
-            sendStep(src, huntId, nil)
+            sendStep(src, hintId, nil)
             local delay = trigger == 'delay' and math.max(0, tonumber(step.delay) or 0) * 1000 or 0
-            SetTimeout(delay + Config.HintGap, function()
-                if current(src, huntId, index, token) then Progress.DeliverHint(src, huntId, index) end
+            SetTimeout(delay + Config.MessageGap, function()
+                if current(src, hintId, index, token) then Progress.DeliverMessage(src, hintId, index) end
             end)
         end
     elseif step.type == 'stash' then
-        releaseScene(src, huntId, nil)
-        sendStep(src, huntId, nil)
+        releaseScene(src, hintId, nil)
+        sendStep(src, hintId, nil)
         if open then
-            Stash.Unlock(src, row, hunt, step)
-            return Progress.Advance(src, huntId)
+            Stash.Unlock(src, row, hint, step)
+            return Progress.Advance(src, hintId)
         end
     elseif step.type == 'scene' and not open then
-        releaseScene(src, huntId, nil)
-        sendStep(src, huntId, nil)
+        releaseScene(src, hintId, nil)
+        sendStep(src, hintId, nil)
     else
-        local info = clientInfo(src, hunt, index, step, not open)
-        releaseScene(src, huntId, info.scene and info.scene.visibility == 'shared' and info.scene.key or nil)
-        if not current(src, huntId, index, token) then return end -- moved on while a shared scene spawned
-        sendStep(src, huntId, info)
+        local info = clientInfo(src, hint, index, step, not open)
+        releaseScene(src, hintId, info.scene and info.scene.visibility == 'shared' and info.scene.key or nil)
+        if not current(src, hintId, index, token) then return end -- moved on while a shared scene spawned
+        sendStep(src, hintId, info)
     end
 
-    Stash.Sync(src, huntId)
+    Stash.Sync(src, hintId)
 end
 
-function Progress.Advance(src, huntId)
+function Progress.Advance(src, hintId)
     local state = Players[src]
-    local row = state and state.rows[huntId]
+    local row = state and state.rows[hintId]
     if not row then return end
     row.step_index = row.step_index + 1
     row.wrong_tries = 0
     row.step_started = now()
     row.comeBackFor = nil
     Progress.SaveRow(row)
-    Progress.StartStep(src, huntId)
+    Progress.StartStep(src, hintId)
 end
 
-function Progress.Complete(src, huntId)
+function Progress.Complete(src, hintId)
     local state = Players[src]
-    local row = state and state.rows[huntId]
+    local row = state and state.rows[hintId]
     if not row then return end
-    local hunt = Hunts.Get(huntId)
+    local hint = Hints.Get(hintId)
     if not row.completed then
         row.completed = true
         row.code, row.pieces = nil, {}
         Progress.SaveRow(row)
-        notify(src, 'success', Config.Text.huntComplete, hunt and hunt.name or nil)
+        notify(src, 'success', Config.Text.hintComplete, hint and hint.name or nil)
     end
-    sendStep(src, huntId, nil)
-    releaseScene(src, huntId, nil)
-    Stash.Sync(src, huntId)
+    sendStep(src, hintId, nil)
+    releaseScene(src, hintId, nil)
+    Stash.Sync(src, hintId)
 end
 
-function Progress.DeliverHint(src, huntId, index)
-    local row, step, hunt = current(src, huntId, index)
-    if not row or step.type ~= 'hint' or row.lockOpen == false then return end
+function Progress.DeliverMessage(src, hintId, index)
+    local row, step, hint = current(src, hintId, index)
+    if not row or step.type ~= 'message' or row.lockOpen == false then return end
 
     local text = tostring(step.text or '')
     local asNote = step.deliver == 'note'
     if step.piece then
-        local piece = revealPiece(src, row, hunt, index, asNote and 'note' or 'hint')
+        local piece = revealPiece(src, row, hint, index, asNote and 'note' or 'message')
         if piece then text = Codes.Insert(text, piece) end
     end
 
     if asNote then
-        if giveItem(src, Config.Items.note, step.title or Config.Text.noteTitle, text, hunt.name) then
+        if giveItem(src, Config.Items.note, step.title or Config.Text.noteTitle, text, hint.name) then
             notify(src, 'inform', step.title or Config.Text.newHint, Config.Text.noteFound, tonumber(step.duration))
         end
     else
         notify(src, 'inform', step.title or Config.Text.newHint, text, tonumber(step.duration))
     end
 
-    Progress.Advance(src, huntId)
+    Progress.Advance(src, hintId)
 end
 
 --- Client says it walked into a hint zone or reached a scene: verify the position, then go on
-function Progress.ZoneEntered(src, huntId, index)
-    local row, step, hunt = current(src, huntId, index)
+function Progress.ZoneEntered(src, hintId, index)
+    local row, step, hint = current(src, hintId, index)
     if not row or row.lockOpen == false then return end
-    if step.type == 'hint' and step.trigger == 'zone' then
+    if step.type == 'message' and step.trigger == 'zone' then
         local coords = vec(step.coords)
         if not coords or distanceTo(src, coords) > (tonumber(step.radius) or 5.0) + Config.ZoneSlack then return end
-        Progress.DeliverHint(src, huntId, index)
+        Progress.DeliverMessage(src, hintId, index)
     elseif step.type == 'scene' then
-        local coords = Progress.SpotFor(hunt.steps, index)
+        local coords = Progress.SpotFor(hint.steps, index)
         if not coords or distanceTo(src, coords) > (tonumber(step.radius) or 15.0) + Config.ZoneSlack then return end
         if step.text and step.text ~= '' then notify(src, 'inform', step.title or Config.Text.newHint, step.text) end
-        Progress.Advance(src, huntId)
+        Progress.Advance(src, hintId)
     end
 end
 
@@ -509,25 +509,25 @@ end
 ---------------------------------------------------------------------------
 
 --- Player inspects the spot: returns what the overlay shows
-function Progress.Inspect(src, huntId)
-    local row, step, hunt = current(src, huntId)
+function Progress.Inspect(src, hintId)
+    local row, step, hint = current(src, hintId)
     if not row or step.type ~= 'inspect' then return end
     if row.lockOpen == false then
         notify(src, 'inform', step.label or Config.Text.inspect, lockedText(step))
         return
     end
-    local spot = Progress.SpotFor(hunt.steps, row.step_index)
+    local spot = Progress.SpotFor(hint.steps, row.step_index)
     if not spot or distanceTo(src, spot) > Config.InspectDistance then return end
 
     local caption = tostring(step.text or '')
     local result = {}
     if step.piece then
         local asNote = step.deliver == 'note'
-        local piece, k, total = revealPiece(src, row, hunt, row.step_index, asNote and 'note' or 'inspect')
+        local piece, k, total = revealPiece(src, row, hint, row.step_index, asNote and 'note' or 'inspect')
         if piece then
             result.pieceN, result.pieceTotal = k, total
             if asNote then
-                giveItem(src, Config.Items.note, step.title or Config.Text.noteTitle, Codes.Insert(caption, piece), hunt.name)
+                giveItem(src, Config.Items.note, step.title or Config.Text.noteTitle, Codes.Insert(caption, piece), hint.name)
                 caption = (caption ~= '' and (caption:gsub('{piece}', '...') .. '\n') or '') .. Config.Text.noteFound
             else
                 caption = Codes.Insert(caption, piece)
@@ -539,28 +539,28 @@ function Progress.Inspect(src, huntId)
     return result
 end
 
-function Progress.InspectDone(src, huntId)
-    local row, step = current(src, huntId)
+function Progress.InspectDone(src, hintId)
+    local row, step = current(src, hintId)
     if not row or step.type ~= 'inspect' or row.inspected ~= row.token then return end
-    Progress.Advance(src, huntId)
+    Progress.Advance(src, hintId)
 end
 
 ---------------------------------------------------------------------------
 -- Password
 ---------------------------------------------------------------------------
 
-local function passwordStep(src, huntId)
-    local row, step, hunt = current(src, huntId)
+local function passwordStep(src, hintId)
+    local row, step, hint = current(src, hintId)
     if not row or step.type ~= 'password' or not row.code or row.lockOpen == false then return end
-    local spot = Progress.SpotFor(hunt.steps, row.step_index)
+    local spot = Progress.SpotFor(hint.steps, row.step_index)
     if spot and distanceTo(src, spot) > Config.PasswordDistance then return end
-    return row, step, hunt
+    return row, step, hint
 end
 
-function Progress.OpenPassword(src, huntId)
-    local row, step = passwordStep(src, huntId)
+function Progress.OpenPassword(src, hintId)
+    local row, step = passwordStep(src, hintId)
     if not row then
-        local r2, s2 = current(src, huntId)
+        local r2, s2 = current(src, hintId)
         if r2 and s2.type == 'password' and r2.lockOpen == false then
             notify(src, 'inform', s2.label or Config.Text.enterCode, lockedText(s2))
         end
@@ -582,8 +582,8 @@ function Progress.OpenPassword(src, huntId)
     }
 end
 
-function Progress.SubmitCode(src, huntId, input)
-    local row, step, hunt = passwordStep(src, huntId)
+function Progress.SubmitCode(src, hintId, input)
+    local row, step, hint = passwordStep(src, hintId)
     if not row then return { ok = false, closed = true } end
 
     local left = row.cooldown_until - now()
@@ -598,7 +598,7 @@ function Progress.SubmitCode(src, huntId, input)
         Progress.SaveRow(row)
         -- let the keypad show OPEN before the step changes
         SetTimeout(1200, function()
-            if current(src, huntId, index, token) then Progress.Advance(src, huntId) end
+            if current(src, hintId, index, token) then Progress.Advance(src, hintId) end
         end)
         return { ok = true }
     end
@@ -617,10 +617,10 @@ function Progress.SubmitCode(src, huntId, input)
     row.cooldown_until = now() + cd
 
     if resetOnFail(step) then
-        resetSegment(row, hunt.steps)
+        resetSegment(row, hint.steps)
         notify(src, 'error', Config.Text.wrongCode, Config.Text.lockedReset)
         SetTimeout(1500, function()
-            if Players[src] and Players[src].rows[huntId] == row then Progress.StartStep(src, huntId) end
+            if Players[src] and Players[src].rows[hintId] == row then Progress.StartStep(src, hintId) end
         end)
         return { ok = false, locked = true, reset = true, triesLeft = 0 }
     end
@@ -636,13 +636,13 @@ end
 
 --- Returns what the client should do: { line = text } (keep talking), { close = true },
 --- { openPassword = true } or { shop = id }
-function Progress.NpcReply(src, huntId, lineIndex, replyIndex)
-    local row, step, hunt = current(src, huntId)
+function Progress.NpcReply(src, hintId, lineIndex, replyIndex)
+    local row, step, hint = current(src, hintId)
     if not row or row.lockOpen == false then return { close = true } end
 
     local npc, npcIndex, hosted = step, row.step_index, false
     if step.type ~= 'npc' then
-        npc, npcIndex = hostNpc(hunt.steps, row.step_index)
+        npc, npcIndex = hostNpc(hint.steps, row.step_index)
         hosted = true
         if not npc then return { close = true } end
     end
@@ -660,20 +660,20 @@ function Progress.NpcReply(src, huntId, lineIndex, replyIndex)
     if action == 'give_clue' then
         local clue = tostring(reply.clue or '')
         if reply.piece then
-            local piece = revealPiece(src, row, hunt, npcIndex, 'npc')
+            local piece = revealPiece(src, row, hint, npcIndex, 'npc')
             if piece then clue = Codes.Insert(clue, piece) end
         end
         if clue ~= '' then notify(src, 'inform', Config.Text.newHint, clue) end
-        if not hosted and reply.complete ~= false then Progress.Advance(src, huntId) end
+        if not hosted and reply.complete ~= false then Progress.Advance(src, hintId) end
         return { line = clue ~= '' and clue or nil, close = clue == '' }
     elseif action == 'open_password' then
         if hosted then return { openPassword = true } end
-        local nextStep = hunt.steps[row.step_index + 1]
+        local nextStep = hint.steps[row.step_index + 1]
         if not nextStep or nextStep.type ~= 'password' then
-            print(('[blaze_hints] hunt %d step %d: open_password but the next step is not a password step'):format(huntId, row.step_index))
+            print(('[blaze_hints] hint %d step %d: open_password but the next step is not a password step'):format(hintId, row.step_index))
             return { close = true }
         end
-        Progress.Advance(src, huntId) -- the password step is now current (hosted by this NPC when it has no spot)
+        Progress.Advance(src, hintId) -- the password step is now current (hosted by this NPC when it has no spot)
         return { openPassword = true }
     elseif action == 'open_shop' then
         local shop = reply.shop ~= '' and reply.shop or npc.shop or Config.Shop.defaultId
@@ -683,18 +683,18 @@ function Progress.NpcReply(src, huntId, lineIndex, replyIndex)
         end
         if reply.receipt and row.code then
             Players[src].pendingReceipt = {
-                huntId = huntId, index = npcIndex, shop = tostring(shop),
+                hintId = hintId, index = npcIndex, shop = tostring(shop),
                 expires = now() + (Config.Shop.receiptMinutes or 10) * 60,
                 complete = finishes,
             }
         elseif finishes then
-            Progress.Advance(src, huntId)
+            Progress.Advance(src, hintId)
         end
         return { shop = shop }
     end
 
     -- 'end' (and anything unknown)
-    if finishes then Progress.Advance(src, huntId) end
+    if finishes then Progress.Advance(src, hintId) end
     return { close = true }
 end
 
@@ -705,28 +705,28 @@ function Progress.OnPurchase(src, shopId)
     if not p or tostring(shopId) ~= p.shop then return end
     state.pendingReceipt = nil
     if now() > p.expires then return end
-    local row = state.rows[p.huntId]
-    local hunt = Hunts.Get(p.huntId)
-    if not row or not hunt or row.completed or not row.code then return end
-    local piece = revealPiece(src, row, hunt, p.index, 'receipt')
+    local row = state.rows[p.hintId]
+    local hint = Hints.Get(p.hintId)
+    if not row or not hint or row.completed or not row.code then return end
+    local piece = revealPiece(src, row, hint, p.index, 'receipt')
     if piece then
         local text = Codes.Insert('Thank you for your purchase!\nScribbled on the back:', piece)
-        giveItem(src, Config.Items.receipt, Config.Text.receiptTitle, text, hunt.name)
+        giveItem(src, Config.Items.receipt, Config.Text.receiptTitle, text, hint.name)
         notify(src, 'inform', Config.Text.newHint, Config.Text.receiptFound)
     end
-    if p.complete and row.step_index == p.index then Progress.Advance(src, p.huntId) end
+    if p.complete and row.step_index == p.index then Progress.Advance(src, p.hintId) end
 end
 
 ---------------------------------------------------------------------------
 -- Load / unload / sync
 ---------------------------------------------------------------------------
 
---- Start any enabled auto-start hunts this character has no row for, then (re)send every step
+--- Start any enabled auto-start hints this character has no row for, then (re)send every step
 function Progress.SyncAll(src)
     local state = Players[src]
     if not state then return end
-    for id, hunt in pairs(Hunts.All()) do
-        if hunt.enabled and hunt.autoStart and not state.rows[id] then
+    for id, hint in pairs(Hints.All()) do
+        if hint.enabled and hint.autoStart and not state.rows[id] then
             local row = newRow(state.citizenid, id)
             state.rows[id] = row
             Progress.SaveRow(row)
@@ -740,7 +740,7 @@ end
 local function normalizePieces(list)
     local out = {}
     for _, v in ipairs(type(list) == 'table' and list or {}) do
-        out[#out + 1] = type(v) == 'number' and ('%d:hint'):format(v) or tostring(v)
+        out[#out + 1] = type(v) == 'number' and ('%d:message'):format(v) or (tostring(v):gsub(':hint$', ':message')) -- 1.0.x keys
     end
     return out
 end
@@ -748,7 +748,7 @@ end
 function Progress.Load(src)
     local citizenid = getCitizenId(src)
     if not citizenid then return end
-    while not Hunts.loaded do Wait(200) end
+    while not Hints.loaded do Wait(200) end
 
     local existing = Players[src]
     if existing and existing.citizenid == citizenid then
@@ -763,9 +763,9 @@ function Progress.Load(src)
     if Players[src] ~= state then return end -- dropped or switched while loading
 
     for _, r in ipairs(rows) do
-        state.rows[r.hunt_id] = {
+        state.rows[r.hint_id] = {
             citizenid = citizenid,
-            hunt_id = r.hunt_id,
+            hint_id = r.hint_id,
             step_index = r.step_index,
             code = decodeJson(r.code),
             pieces = normalizePieces(decodeJson(r.pieces_found)),
@@ -786,40 +786,90 @@ function Progress.Unload(src)
     Players[src] = nil -- pending timers check Players[src] / row tokens and stop on their own
 end
 
-function Progress.OnHuntUpdated(huntId)
+function Progress.OnHintUpdated(hintId)
     for src, state in pairs(Players) do
-        local hunt = Hunts.Get(huntId)
-        if hunt and hunt.enabled and hunt.autoStart and not state.rows[huntId] then
-            state.rows[huntId] = newRow(state.citizenid, huntId)
-            Progress.SaveRow(state.rows[huntId])
+        local hint = Hints.Get(hintId)
+        if hint and hint.enabled and hint.autoStart and not state.rows[hintId] then
+            state.rows[hintId] = newRow(state.citizenid, hintId)
+            Progress.SaveRow(state.rows[hintId])
         end
-        if state.rows[huntId] then Progress.StartStep(src, huntId) end
+        if state.rows[hintId] then Progress.StartStep(src, hintId) end
     end
 end
 
-function Progress.OnHuntDeleted(huntId)
+function Progress.OnHintDeleted(hintId)
     for src, state in pairs(Players) do
-        if state.rows[huntId] then
-            state.rows[huntId] = nil
-            sendStep(src, huntId, nil)
-            releaseScene(src, huntId, nil)
-            TriggerClientEvent('blaze_hints:client:stash', src, huntId, nil)
+        if state.rows[hintId] then
+            state.rows[hintId] = nil
+            sendStep(src, hintId, nil)
+            releaseScene(src, hintId, nil)
+            TriggerClientEvent('blaze_hints:client:stash', src, hintId, nil)
         end
     end
 end
 
 --- Admin reset of one character's progress (online player by server id)
-function Progress.Reset(src, huntId)
+function Progress.Reset(src, hintId)
     local state = Players[src]
     if not state then return false end
-    MySQL.update.await('DELETE FROM `blaze_hints_progress` WHERE `citizenid` = ? AND `hunt_id` = ?', { state.citizenid, huntId })
-    if state.rows[huntId] then state.rows[huntId].token = state.rows[huntId].token + 1 end
-    state.rows[huntId] = nil
-    sendStep(src, huntId, nil)
-    releaseScene(src, huntId, nil)
-    TriggerClientEvent('blaze_hints:client:stash', src, huntId, nil)
+    MySQL.update.await('DELETE FROM `blaze_hints_progress` WHERE `citizenid` = ? AND `hint_id` = ?', { state.citizenid, hintId })
+    if state.rows[hintId] then state.rows[hintId].token = state.rows[hintId].token + 1 end
+    state.rows[hintId] = nil
+    sendStep(src, hintId, nil)
+    releaseScene(src, hintId, nil)
+    TriggerClientEvent('blaze_hints:client:stash', src, hintId, nil)
     Progress.SyncAll(src)
     return true
+end
+
+--- Server id of an online character (nil if offline)
+function Progress.FindSrc(citizenid)
+    for src, state in pairs(Players) do
+        if state.citizenid == citizenid then return src end
+    end
+end
+
+--- Put an online character on step `step` of a hint (new code for that stretch)
+function Progress.SetStep(src, hintId, step)
+    local state = Players[src]
+    local hint = Hints.Get(hintId)
+    if not state or not hint then return false end
+    local row = state.rows[hintId] or newRow(state.citizenid, hintId)
+    state.rows[hintId] = row
+    row.token = row.token + 1
+    row.step_index = math.max(1, math.min(step, #hint.steps))
+    row.completed = false
+    row.code, row.pieces, row.wrong_tries, row.cooldown_until = nil, {}, 0, 0
+    row.step_started = now()
+    row.comeBackFor = nil
+    Progress.SaveRow(row)
+    Progress.StartStep(src, hintId)
+    return true
+end
+
+--- Everyone's progress on a hint was wiped: online players start it again (if it auto-starts)
+function Progress.ForgetHint(hintId)
+    for src, state in pairs(Players) do
+        if state.rows[hintId] then
+            state.rows[hintId].token = state.rows[hintId].token + 1
+            state.rows[hintId] = nil
+            sendStep(src, hintId, nil)
+            releaseScene(src, hintId, nil)
+            TriggerClientEvent('blaze_hints:client:stash', src, hintId, nil)
+            Progress.SyncAll(src)
+        end
+    end
+end
+
+--- How many online characters are on each hint (not finished)
+function Progress.OnlineCounts()
+    local counts = {}
+    for _, state in pairs(Players) do
+        for hintId, row in pairs(state.rows) do
+            if not row.completed then counts[hintId] = (counts[hintId] or 0) + 1 end
+        end
+    end
+    return counts
 end
 
 --- Code pieces this character has found (only their own pieces, never the full code unless they found them all)
@@ -827,14 +877,14 @@ function Progress.Notes(src)
     local state = Players[src]
     if not state then return {} end
     local notes = {}
-    for huntId, row in pairs(state.rows) do
-        local hunt = Hunts.Get(huntId)
-        if hunt and hunt.enabled and not row.completed then
-            local entry = { hunt = hunt.name, step = row.step_index, steps = #hunt.steps, pieces = {} }
+    for hintId, row in pairs(state.rows) do
+        local hint = Hints.Get(hintId)
+        if hint and hint.enabled and not row.completed then
+            local entry = { hint = hint.name, step = row.step_index, steps = #hint.steps, pieces = {} }
             if row.code then
                 local found = {}
                 for _, key in ipairs(row.pieces) do found[key] = true end
-                local slots = Codes.Slots(hunt.steps, row.code.step)
+                local slots = Codes.Slots(hint.steps, row.code.step)
                 local pieces = Codes.Split(row.code.value, #slots)
                 for k, slot in ipairs(slots) do
                     if pieces[k] and found[slot.key] then
@@ -855,13 +905,13 @@ CreateThread(function()
     while true do
         Wait(math.max(5, Config.TimeLockCheck or 20) * 1000)
         for src, state in pairs(Players) do
-            for huntId, row in pairs(state.rows) do
-                local hunt = Hunts.Get(huntId)
-                local step = hunt and hunt.enabled and not row.completed and hunt.steps[row.step_index]
+            for hintId, row in pairs(state.rows) do
+                local hint = Hints.Get(hintId)
+                local step = hint and hint.enabled and not row.completed and hint.steps[row.step_index]
                 if step and TimeLock.Mode(step.timeLock) ~= 'off' then
                     local open, _, expired = TimeLock.Check(step.timeLock, row)
                     if expired or open ~= row.lockOpen then
-                        Progress.StartStep(src, huntId)
+                        Progress.StartStep(src, hintId)
                     end
                 end
             end

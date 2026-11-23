@@ -5,7 +5,7 @@
 -- private (default): the client spawns non-networked entities just for that player.
 -- shared: the server spawns networked entities once per scene (everyone sees them) while anyone is on that step.
 --         The entity owner applies doors / guard behaviour from the 'blazeHintsScene' state bag. Effects and the
---         search blip stay on the hunters' own screens.
+--         search blip stay on the screens of players on that step.
 Scenes = { shared = {} } -- [key] = { refs = { [src] = true }, entities = { handles }, netIds = { ... } }
 
 local function hash(model) return type(model) == 'number' and model or joaat(model) end

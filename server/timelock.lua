@@ -4,7 +4,7 @@
 --   opens, closes,          -- hours 0-24 (decimals ok, 22.5 = 22:30) for ingame_hours / real_time,
 --                           -- 'YYYY-MM-DD HH:MM' for date_window (either one can be empty)
 --   days = { 1..7 },        -- real_time: 1 = Monday ... 7 = Sunday (empty = every day)
---   seconds, timerMode,     -- timer_after_last_step: 'wait' (opens after) | 'expire' (closes after, then the hunt goes back)
+--   seconds, timerMode,     -- timer_after_last_step: 'wait' (opens after) | 'expire' (closes after, then the hint goes back)
 --   lockedMessage,          -- NPC line / inspect text while locked
 --   hideWhileLocked,        -- NPC / inspect / password spot hidden while locked (else they show the locked message)
 --   comeBack,               -- send a "come back at X" hint when the step is locked
