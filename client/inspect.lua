@@ -16,7 +16,7 @@ function Inspect.Show(huntId, data, focus, opts)
     if camOn then
         -- orbit: mouse looks around the clue, the shot drifts by itself, your controls are locked
         if type(focus) == 'number' and DoesEntityExist(focus) then
-            Camera.Focus(focus, { distance = 1.0, side = 0.35, height = 0.35, fov = 45.0, hidePlayer = true, orbit = true })
+            Camera.Focus(focus, { distance = 1.0, side = 0.35, height = 0.35, fov = 45.0, orbit = true })
         else
             Camera.FocusCoords(focus, { orbit = true })
         end

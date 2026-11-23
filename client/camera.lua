@@ -85,11 +85,38 @@ end
 Camera = { cam = nil }
 
 --- Every frame while this camera is up:
----   hidePlayer: hide your own ped on your screen (others still see you)
+---   hidePlayer: hide your own ped (Config.Camera.hideSelf when not given)
+---   nearby:     hide other players standing at the target (Config.Camera.hideNearbyPlayers)
+---               Both use SetEntityLocallyInvisible: ONLY on this screen, everyone else still sees everyone.
 ---   orbit:      your controls are locked; the mouse turns the camera around the target (limited range)
 ---               and the shot slowly pushes in and sways by itself
 local function runCam(cam, target, pos, opts)
-    if not opts.hidePlayer and not opts.orbit then return end
+    local CC = Config.Camera or {}
+    local hideSelf = opts.hidePlayer
+    if hideSelf == nil then hideSelf = CC.hideSelf ~= false end
+    local hideNearby = CC.hideNearbyPlayers ~= false
+    local radius = CC.nearbyRadius or 2.5
+    if not hideSelf and not hideNearby and not opts.orbit then return end
+
+    -- other players at the target, refreshed a few times a second
+    local nearby = {}
+    if hideNearby then
+        CreateThread(function()
+            local me = PlayerId()
+            while Camera.cam == cam do
+                local list = {}
+                for _, player in ipairs(GetActivePlayers()) do
+                    if player ~= me then
+                        local ped = GetPlayerPed(player)
+                        if ped ~= 0 and #(GetEntityCoords(ped) - target) < radius then list[#list + 1] = ped end
+                    end
+                end
+                nearby = list
+                Wait(250)
+            end
+        end)
+    end
+
     local rel = pos - target
     local baseYaw = math.atan(rel.y, rel.x)
     local baseDist = math.max(0.3, #vector3(rel.x, rel.y, 0.0))
@@ -100,7 +127,10 @@ local function runCam(cam, target, pos, opts)
 
     CreateThread(function()
         while Camera.cam == cam do
-            if opts.hidePlayer then SetEntityLocallyInvisible(PlayerPedId()) end
+            if hideSelf then SetEntityLocallyInvisible(PlayerPedId()) end
+            for i = 1, #nearby do
+                if DoesEntityExist(nearby[i]) then SetEntityLocallyInvisible(nearby[i]) end
+            end
             if opts.orbit then
                 DisableAllControlActions(0)
                 EnableControlAction(0, 249, true) -- push to talk
@@ -171,7 +201,6 @@ function Camera.FocusCoords(target, opts)
     SetCamActive(cam, true)
     RenderScriptCams(true, true, 700, true, true)
     Camera.cam = cam
-    if opts.hidePlayer == nil then opts.hidePlayer = true end
     runCam(cam, target, pos, opts)
     Hud.Radar('camera', true)
     Hud.Hold('camera', true)

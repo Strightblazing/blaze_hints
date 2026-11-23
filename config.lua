@@ -29,6 +29,15 @@ Config.HintGap = 1500              -- ms between back-to-back "after previous" h
 Config.NpcSpawnDistance = 80.0     -- hunt NPCs only exist on your screen inside this range
 Config.SceneSpawnDistance = 150.0  -- private world scenes only exist inside this range
 
+-- Hunt cameras (inspect close-up and cinematic NPC dialog): hide characters that would clip into the shot.
+-- This is ONLY on the screen of the player looking: everyone else still sees everyone. When your buddy
+-- inspects a clue, you never turn invisible for anyone.
+Config.Camera = {
+    hideSelf = true,               -- your own character
+    hideNearbyPlayers = true,      -- other players standing at the clue / NPC
+    nearbyRadius = 2.5,            -- metres around the clue / NPC face
+}
+
 -- Where-to-look markers: a floating icon over the current inspect spot, keypad and (unlocked) stash.
 -- Only the hunter on that step sees it. Each step can turn it off in the builder ("Show a marker").
 Config.Markers = {
