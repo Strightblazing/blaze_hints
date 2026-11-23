@@ -6,6 +6,8 @@ name 'blaze_hints'
 author 'Blaze'
 description 'Clue hunts built in game: hints, inspect spots, NPC dialog, code pieces, password keypads, world scenes and personal stashes (Qbox, ox_lib)'
 version '1.0.0'
+license 'GPL-3.0' -- see LICENSE
+repository 'Strightblazing/blaze_hints'
 
 shared_scripts {
     '@ox_lib/init.lua',

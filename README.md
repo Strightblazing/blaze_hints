@@ -118,3 +118,8 @@ an optional temporary search-area blip.
 - `Config.MaxWrongTries`, `Config.DefaultCooldown`, `Config.ResetOnFail`: password defaults (per step in the builder).
 - `Config.Words`: random words for word codes.
 - `Config.Text`: every player-facing string.
+
+## License
+
+GNU GPL v3 (see [LICENSE](LICENSE)). You can use, change and share it; if you share a changed version,
+share its source under the same license.
